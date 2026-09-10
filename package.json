@@ -1,0 +1,44 @@
+{
+  "name": "pi-loop-mode",
+  "version": "2.5.4",
+  "description": "Atomic coding cycles for pi — supervised or autonomous mode, one genuinely fresh Pi session per atom (conversation history is never durable state), durable handoff via GOAL.md/PROGRESS.md/TESTMANUAL.md/ASSUMPTIONS.md/IMPROVEMENTS.md plus Git checkpoints. Supervised mode does exactly one small atomic task per operator-driven cycle; autonomous mode runs until MVP with a new Pi session per atom. Includes the cross-session regression protocol, a test-matrix + implementation-first workflow, objective goal function (--check) with score/regression tracking, error retry with backoff, layered anti-repetition and degenerate-generation defenses, rescue model, LLM-independent context-overflow recovery, and bounded per-iteration JSONL stats with auto-resume.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "agent",
+    "loop",
+    "unattended",
+    "autonomous",
+    "llm"
+  ],
+  "author": "Robert Ressl <rr@canus.ch>",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "lint": "for file in extensions/index.ts src/*.ts tests/*.test.ts tests/helpers/*.ts; do node --check \"$file\"; done",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "files": [
+    "extensions",
+    "src",
+    "skills",
+    "prompts",
+    "assets",
+    "README.md",
+    "DOCUMENTATION.md",
+    "DOCUMENTATION_de.md",
+    "CHANGELOG.md",
+    "GALLERY.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["extensions"],
+    "skills": ["skills"],
+    "prompts": ["prompts"],
+    "video": "https://unpkg.com/pi-loop-mode@2.5.4/assets/pi-loop-mode-demo.mp4",
+    "image": "https://unpkg.com/pi-loop-mode@2.5.4/assets/pi-loop-mode-preview.png"
+  }
+}
