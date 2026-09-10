@@ -17,12 +17,6 @@ This fork changes the core behavior to **atomic coding cycles**: the work is dec
 - **Upstream package:** https://www.npmjs.com/package/pi-loop-mode
 - **Upstream package page (pi.dev):** https://pi.dev/packages/pi-loop-mode
 
-## Preview
-
-[![pi-loop-mode preview](https://unpkg.com/pi-loop-mode@2.5.4/assets/pi-loop-mode-preview.png)](https://unpkg.com/pi-loop-mode@2.5.4/assets/pi-loop-mode-demo.mp4)
-
-Click the preview image to open the short MP4 demo. The same video is also exposed as `pi.video` metadata for the pi.dev package gallery.
-
 ## What it does
 
 - **Atomic coding cycles, one atom per session**: supervised or autonomous. Each atom is one small observable behavior with a focused test. One Pi session works on exactly one atom, then stops; the next atom gets a *genuinely fresh* Pi session — conversation history is deliberately not durable state.
