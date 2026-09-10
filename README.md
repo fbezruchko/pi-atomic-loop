@@ -1,4 +1,4 @@
-# pi-loop-mode (atomic cycles)
+# pi-atomic-loop (atomic cycles)
 
 > **Atomic coding cycles** for [pi](https://github.com/earendil-works/pi) — supervised or autonomous, with **one genuinely fresh Pi session per atom** (conversation history is never durable state).
 >
@@ -140,26 +140,14 @@ Score ideas: number of passing tests, test coverage, implemented endpoints, `-` 
 | Loop model unavailable after restart | Warning; loop continues with the current model. |
 | `--max N` reached | Loop pauses; `/loop resume` continues (uncapped if exhausted). |
 
-## Install
-
-```bash
-pi install npm:pi-loop-mode
-```
-
-Or from a local checkout:
-
-```bash
-pi install /path/to/pi-loop-mode
-```
-
-Then start or reload pi and run `/loop help`.
+Start or reload pi and run `/loop help`.
 
 > **Security note:** pi packages run with full system access, and this package is built for *unattended* operation — the model works for hours without supervision. Use a dedicated directory/repo, ideally a VM or container, and keep production systems out of reach.
 
 ## Files
 
 ```text
-pi-loop-mode/
+pi-atomic-loop/
 ├── package.json
 ├── README.md                 # This file
 ├── DOCUMENTATION.md          # Full documentation with examples (English)
