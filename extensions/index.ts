@@ -1661,7 +1661,7 @@ async function gitExec(
 }> {
   try {
     const result =
-      await ctx.exec(
+      await piGlobal!.exec(
         "git",
         args,
         { timeout },
@@ -1786,7 +1786,7 @@ async function ignoreLoopLog(
   ].filter(Boolean);
 
   for (const path of candidates) {
-    await ctx.exec(
+    await piGlobal!.exec(
       "bash",
       [
         "-lc",

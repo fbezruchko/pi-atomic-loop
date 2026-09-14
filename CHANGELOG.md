@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- **Fix `ctx.exec is not a function`**: the git helpers (`gitExec`, `ignoreLoopLog`) called `exec()` on the extension *context*, but in current pi `exec()` lives on the extension *API* object, not the context. They now call it via the captured API (`piGlobal!.exec`). All other `ctx.*` accesses were verified to map to valid context members.
+
 ## 1.0.1
 
 - **Scripts fix**: `lint` now checks only the files that exist (`extensions/index.ts`, `src/*.ts`); the inherited `tests/*.test.ts` globs (there is no `tests/` directory in this repo) are removed. `test` is an honest no-op, since the package ships no test suite.
