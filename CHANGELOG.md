@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- **Scripts fix**: `lint` now checks only the files that exist (`extensions/index.ts`, `src/*.ts`); the inherited `tests/*.test.ts` globs (there is no `tests/` directory in this repo) are removed. `test` is an honest no-op, since the package ships no test suite.
+
 ## 1.0.0 — Fork / rebrand (pi-atomic-loop)
 
 - **Autonomous package**: renamed from the upstream `pi-loop-mode` to `pi-atomic-loop`; version numbering restarts at 1.0.0; author is now `fbezruchko`.
