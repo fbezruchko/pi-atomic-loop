@@ -25,14 +25,22 @@ Unattended loop mode for [pi](https://github.com/earendil-works/pi): you give th
 
 ## 1. Installation
 
+From git (recommended for now):
+
 ```bash
-pi install npm:pi-loop-mode
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0
 ```
 
 Or from a local checkout:
 
 ```bash
-pi install /path/to/pi-loop-mode
+pi install /path/to/pi-atomic-loop
+```
+
+Or from npm (once published):
+
+```bash
+pi install npm:pi-atomic-loop
 ```
 
 Then restart pi or run `/reload`. The `/loop` command is now available.
@@ -40,15 +48,13 @@ Then restart pi or run `/reload`. The `/loop` command is now available.
 **Package files:**
 
 ```text
-pi-loop-mode/
+pi-atomic-loop/
 ├── package.json              # pi package definition
 ├── README.md                 # Overview
 ├── DOCUMENTATION.md          # This file
 ├── DOCUMENTATION_de.md       # German translation
 ├── CHANGELOG.md              # Version history
-├── GALLERY.md                # pi.dev gallery asset notes
 ├── LICENSE                   # GNU AGPL v3.0 only
-├── assets/                   # pi.dev preview video + poster image
 ├── extensions/index.ts       # Pi command/event orchestration
 ├── src/                       # Repetition, parsing, state, checks, and bounded logging
 ├── skills/loop-skill/SKILL.md  # Behavior rules for the model in loop mode

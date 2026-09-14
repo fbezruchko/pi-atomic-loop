@@ -1,4 +1,4 @@
-# pi-atomic-loop (atomic cycles)
+# pi-atomic-loop
 
 > **Atomic coding cycles** for [pi](https://github.com/earendil-works/pi) — supervised or autonomous, with **one genuinely fresh Pi session per atom** (conversation history is never durable state).
 >
@@ -134,7 +134,27 @@ Score ideas: number of passing tests, test coverage, implemented endpoints, `-` 
 | Loop model unavailable after restart | Warning; loop continues with the current model. |
 | `--max N` reached | Loop pauses; `/loop resume` continues (uncapped if exhausted). |
 
-Start or reload pi and run `/loop help`.
+## Install
+
+From git (recommended for now):
+
+```bash
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0
+```
+
+Or from a local checkout:
+
+```bash
+pi install /path/to/pi-atomic-loop
+```
+
+Or from npm (once published):
+
+```bash
+pi install npm:pi-atomic-loop
+```
+
+Then start or reload pi and run `/loop help`.
 
 > **Security note:** pi packages run with full system access, and this package is built for *unattended* operation — the model works for hours without supervision. Use a dedicated directory/repo, ideally a VM or container, and keep production systems out of reach.
 
@@ -147,9 +167,7 @@ pi-atomic-loop/
 ├── DOCUMENTATION.md          # Full documentation with examples (English)
 ├── DOCUMENTATION_de.md       # German translation
 ├── CHANGELOG.md
-├── GALLERY.md                # pi.dev gallery asset notes
 ├── LICENSE                   # GNU AGPL v3.0 only
-├── assets/                   # pi.dev preview video + poster image
 ├── extensions/index.ts       # Pi command/event orchestration
 ├── src/                       # Repetition, parsing, state, checks, and bounded logging
 ├── skills/loop-skill/SKILL.md  # Behavior rules for the model in loop mode

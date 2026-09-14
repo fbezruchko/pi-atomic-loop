@@ -25,14 +25,22 @@ Unbeaufsichtigter Loop-Modus für [pi](https://github.com/earendil-works/pi): Du
 
 ## 1. Installation
 
+Aus Git (aktuell empfohlen):
+
 ```bash
-pi install npm:pi-loop-mode
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0
 ```
 
 Oder aus einem lokalen Checkout:
 
 ```bash
-pi install /pfad/zu/pi-loop-mode
+pi install /pfad/zu/pi-atomic-loop
+```
+
+Oder aus npm (sobald veröffentlicht):
+
+```bash
+pi install npm:pi-atomic-loop
 ```
 
 Danach pi neu starten oder `/reload` ausführen. Der Befehl `/loop` ist dann verfügbar.
@@ -40,15 +48,13 @@ Danach pi neu starten oder `/reload` ausführen. Der Befehl `/loop` ist dann ver
 **Dateien des Pakets:**
 
 ```text
-pi-loop-mode/
+pi-atomic-loop/
 ├── package.json              # pi-Paketdefinition
 ├── README.md                 # Übersicht (englisch)
 ├── DOCUMENTATION.md          # Hauptdokumentation (englisch)
 ├── DOCUMENTATION_de.md       # Diese Datei (deutsche Übersetzung)
 ├── CHANGELOG.md              # Versionshistorie
-├── GALLERY.md                # Hinweise zu pi.dev-Gallery-Assets
 ├── LICENSE                   # GNU AGPL v3.0 only
-├── assets/                   # pi.dev-Vorschauvideo + Posterbild
 ├── extensions/index.ts       # Pi-Command-/Event-Orchestrierung
 ├── src/                       # Wiederholung, Parsing, Zustand, Checks und begrenztes Logging
 ├── skills/loop-skill/SKILL.md  # Verhaltensregeln für das Modell im Loop

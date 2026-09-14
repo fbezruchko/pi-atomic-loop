@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0 — Fork / rebrand (pi-atomic-loop)
+
+- **Autonomous package**: renamed from the upstream `pi-loop-mode` to `pi-atomic-loop`; version numbering restarts at 1.0.0; author is now `fbezruchko`.
+- **Fork attribution**: forked from upstream [`pi-loop-mode`](https://www.npmjs.com/package/pi-loop-mode) v2.5.4 by Robert Ressl (see README "About this fork").
+- **Preview metadata removed**: dropped the `pi.video`/`pi.image` gallery fields and the `assets/` + `GALLERY.md` files — the old demo no longer reflects this extension's atomic-cycle behavior.
+- **Install**: from git (`pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0`), local path, or npm (once published).
+
+---
+
+## Upstream pi-loop-mode history (pre-fork)
+
+The entries below are the upstream `pi-loop-mode` release history, kept for reference.
+
 ## 2.5.4
 
 - **Early 512k-model compaction guidance**: documented project settings that reserve the full 65,536-token output budget and keep 150k recent tokens, preventing tool-heavy sessions from reaching the hard context boundary.
