@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- **Hide the `Loop …` footer label when no cycle is active.** The extension set the status bar unconditionally on every `session_start`, so plain sessions (and new ones) always showed `Loop SUPERVISED` even though nothing was running. The label is now shown only while a cycle is active and cleared on `session_start` (inactive), `/loop stop`, `/loop end`, and the git-blocked abort path.
+
 ## 1.0.3
 
 - **Clean context for supervised atoms**: `/loop run`, `/loop start` and `/loop resume` now create a genuinely fresh Pi session for every atom (same `newSession()` handoff as autonomous mode). Previously the supervised cycle kept running in the current session while its instructions claimed "This is a NEW Pi session" — the whole previous atom's context stayed in the window. After an atom completes, supervised mode stops and waits for `/loop resume` (which starts the next fresh session); autonomous mode continues spawning fresh sessions as before.

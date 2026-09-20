@@ -2001,6 +2001,11 @@ async function startFreshAtomSession(
       { reason: gitReady.reason },
     );
 
+    ctx.ui.setStatus(
+      "loop",
+      undefined,
+    );
+
     ctx.ui.notify(
       `Loop stopped: ${gitReady.reason}`,
       "error",
@@ -2853,6 +2858,11 @@ function goalSummaryText(): string {
               ctx.abort();
             }
 
+            ctx.ui.setStatus(
+              "loop",
+              undefined,
+            );
+
             ctx.ui.notify(
               "Loop stopped.",
               "info",
@@ -2876,6 +2886,11 @@ function goalSummaryText(): string {
 
             persistState(
               pi,
+            );
+
+            ctx.ui.setStatus(
+              "loop",
+              undefined,
             );
 
             ctx.ui.notify(
@@ -3065,9 +3080,13 @@ function goalSummaryText(): string {
         );
       }
 
+      // Show the footer label only while a cycle is active; keep the
+      // footer clean in plain sessions where the loop was never started.
       ctx.ui.setStatus(
         "loop",
-        statusBarText(),
+        state.active
+          ? statusBarText()
+          : undefined,
       );
     },
   );
