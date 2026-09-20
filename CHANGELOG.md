@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- **Clean context for supervised atoms**: `/loop run`, `/loop start` and `/loop resume` now create a genuinely fresh Pi session for every atom (same `newSession()` handoff as autonomous mode). Previously the supervised cycle kept running in the current session while its instructions claimed "This is a NEW Pi session" — the whole previous atom's context stayed in the window. After an atom completes, supervised mode stops and waits for `/loop resume` (which starts the next fresh session); autonomous mode continues spawning fresh sessions as before.
+- **`/loop <goal>` sets the goal only**: the convenience form now has the same semantics as `/loop goal` — it stores goal + configuration and starts nothing. Starting is always explicit: `/loop prepare` (optional) then `/loop run`. One-shot start remains available via `/loop start <goal>`.
+- **Dead code removed**: `runLoop()`, `resetCycleState()`, `sendFreshLoopTurn()` are gone; the fresh-session spawner (`startFreshAtomSession`) is now the single path for both modes. Help text and DOCUMENTATION.md (command reference, core concept) updated to match.
+
 ## 1.0.2
 
 - **Fix `ctx.exec is not a function`**: the git helpers (`gitExec`, `ignoreLoopLog`) called `exec()` on the extension *context*, but in current pi `exec()` lives on the extension *API* object, not the context. They now call it via the captured API (`piGlobal!.exec`). All other `ctx.*` accesses were verified to map to valid context members.

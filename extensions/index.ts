@@ -849,135 +849,6 @@ function prepareInstructions(): string {
   );
 }
 
-function resetCycleState(
-  preserveAutonomousRun: boolean,
-): void {
-  state.active = true;
-
-  state.startTime =
-    Date.now();
-
-  state.iterationCount =
-    0;
-
-  if (
-    !preserveAutonomousRun
-  ) {
-    state.atomsCompletedThisRun =
-      0;
-
-    state.autonomousRunStartedAt =
-      Date.now();
-  }
-
-  state.maxIterations =
-    state.untilDone
-      ? state.maxIterations
-      : ATOMS_PER_SESSION;
-
-  state.consecutiveStuckCount =
-    0;
-
-  state.consecutiveErrorCount =
-    0;
-
-  state.interventionCount =
-    0;
-
-  state.doneSignalCount =
-    0;
-
-  state.blockedSignalCount =
-    0;
-
-  state.lastAssistantFingerprints =
-    [];
-
-  state.lastAssistantSnippets =
-    [];
-
-  state.lastAssistantTexts =
-    [];
-
-  state.recentToolResults =
-    [];
-
-  state.turnsWithoutTools =
-    0;
-
-  state.toolCallsThisTurn =
-    0;
-
-  state.rescueActive =
-    false;
-
-  state.rescueReturnModel =
-    "";
-
-  state.penaltyTurnsRemaining =
-    0;
-
-  state.lastCompactIteration =
-    0;
-
-  state.softStopRequested =
-    false;
-
-  state.atomCycleClosed =
-    false;
-
-  state.autonomousHandoffPending =
-    false;
-
-  state.status =
-    state.regressionActive
-      ? "regression"
-      : "running";
-
-  state.lastNotice =
-    "Atomic cycle started.";
-}
-
-function runLoop(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  kind: TurnKind,
-): void {
-  runToken++;
-
-  clearPendingTimer();
-
-  degenerateAbortPending =
-    false;
-
-  emergencyCompactionPending =
-    false;
-
-  resetCycleState(
-    false,
-  );
-
-  persistState(pi);
-
-  ctx.ui.notify(
-    state.untilDone
-      ? "Autonomous loop started."
-      : "Supervised atomic loop started.",
-    "info",
-  );
-
-  ctx.ui.setStatus(
-    "loop",
-    statusBarText(),
-  );
-
-  sendLoopTurn(
-    pi,
-    kind,
-    ctx,
-  );
-}
-
 function sendLoopTurn(
   pi: ExtensionAPI,
   kind: TurnKind,
@@ -1036,46 +907,6 @@ function sendLoopTurn(
           deliverAs:
             "followUp",
         },
-  );
-}
-
-async function sendFreshLoopTurn(
-  ctx: ReplacedSessionContext,
-  kind: TurnKind,
-): Promise<void> {
-  await ctx.sendMessage(
-    {
-      customType:
-        MESSAGE_TYPE,
-
-      content:
-        loopInstructions(
-          kind,
-        ),
-
-      display:
-        true,
-
-      details: {
-        kind,
-
-        iteration:
-          state.iterationCount +
-          1,
-
-        atomId:
-          state.currentAtomId ||
-          undefined,
-
-        mode:
-          "autonomous",
-      },
-    },
-
-    {
-      triggerTurn:
-        true,
-    },
   );
 }
 
@@ -1596,11 +1427,14 @@ function finalizeCurrentCycle(
 }
 
 /**
- * Starts a fresh autonomous cycle in a new Pi session.
+ * Starts one atomic cycle in a genuinely fresh Pi session.
+ * Used for BOTH supervised and autonomous modes:
+ *   - the new session contains only the durable handoff entry (loop state),
+ *     an optional model change, and the fresh task instruction;
+ *   - conversation history is never carried across atoms.
  *
  * Pi 0.84.4 exposes newSession() on ExtensionCommandContext and provides
  * the replacement-session command context via withSession().
- *
  * We deliberately omit parentSession so the next atom has a clean
  * conversational history.
  */
@@ -2141,10 +1975,11 @@ async function commitAtomicChanges(
   );
 }
 
-async function startFreshAutonomousSession(
+async function startFreshAtomSession(
   ctx:
     | ExtensionCommandContext
     | ReplacedSessionContext,
+  kind: "start" | "resume",
 ): Promise<void> {
   const gitReady =
     await ensureGitRepository(
@@ -2281,7 +2116,7 @@ async function startFreshAutonomousSession(
            */
           await freshCtx.sendUserMessage(
             loopInstructions(
-              "resume",
+              kind,
             ),
           );
 
@@ -2306,6 +2141,19 @@ async function startFreshAutonomousSession(
             return;
           }
 
+          /**
+           * Supervised mode: exactly one atom per session. The turn_end
+           * handler already persisted the stopped/paused/regression state
+           * and notified the operator. Do NOT continue automatically —
+           * the next atom is started by an explicit /loop resume, which
+           * creates yet another fresh session with a clean context.
+           */
+          if (
+            !state.untilDone
+          ) {
+            return;
+          }
+
           /** Regression always wins over the normal atom queue. */
           if (
             state.regressionActive
@@ -2314,8 +2162,9 @@ async function startFreshAutonomousSession(
             state.status =
               "regression";
 
-            await startFreshAutonomousSession(
+            await startFreshAtomSession(
               freshCtx,
+              "resume",
             );
 
             return;
@@ -2353,8 +2202,9 @@ async function startFreshAutonomousSession(
               "running";
             state.currentAtomId = "";
 
-            await startFreshAutonomousSession(
+            await startFreshAtomSession(
               freshCtx,
+              "resume",
             );
 
             return;
@@ -2397,7 +2247,7 @@ async function startFreshAutonomousSession(
     state.status =
       "paused";
     state.lastNotice =
-      "Autonomous fresh-session transition was cancelled.";
+      "Fresh-session transition was cancelled.";
 
     persistState(
       piGlobal!,
@@ -2547,7 +2397,7 @@ function goalSummaryText(): string {
     "loop",
     {
       description:
-        "Atomic loop: default = one atom; --until-done = autonomous atoms in fresh Pi sessions.",
+        "Atomic loop: every atom runs in a fresh Pi session. /loop <goal> sets the goal; /loop prepare writes GOAL.md; /loop run works one atom; --until-done = autonomous until done.",
 
       handler:
         async (
@@ -2623,19 +2473,10 @@ function goalSummaryText(): string {
               return;
             }
 
-            if (
-              state.untilDone
-            ) {
-              await startFreshAutonomousSession(
-                ctx,
-              );
-            } else {
-              runLoop(
-                pi,
-                ctx,
-                "start",
-              );
-            }
+            await startFreshAtomSession(
+              ctx,
+              "start",
+            );
 
             return;
           }
@@ -2861,19 +2702,10 @@ function goalSummaryText(): string {
               return;
             }
 
-            if (
-              state.untilDone
-            ) {
-              await startFreshAutonomousSession(
-                ctx,
-              );
-            } else {
-              runLoop(
-                pi,
-                ctx,
-                "start",
-              );
-            }
+            await startFreshAtomSession(
+              ctx,
+              "start",
+            );
 
             return;
           }
@@ -2951,19 +2783,10 @@ function goalSummaryText(): string {
               return;
             }
 
-            if (
-              state.untilDone
-            ) {
-              await startFreshAutonomousSession(
-                ctx,
-              );
-            } else {
-              runLoop(
-                pi,
-                ctx,
-                "resume",
-              );
-            }
+            await startFreshAtomSession(
+              ctx,
+              "resume",
+            );
 
             return;
           }
@@ -3101,11 +2924,11 @@ function goalSummaryText(): string {
           ) {
             ctx.ui.notify(
               "Loop workflow:\n" +
-                "/loop goal <goal>\n" +
+                "/loop <goal> or /loop goal <goal> — set the goal, starts nothing\n" +
                 "/loop prepare [--model M]\n" +
-                "/loop run [--model M] — one supervised atom\n" +
-                "/loop run --until-done [--model M] [--max N] — autonomous atoms in fresh Pi sessions\n" +
-                "/loop resume — next supervised cycle / autonomous session\n" +
+                "/loop run [--model M] — one atom in a fresh Pi session (clean context)\n" +
+                "/loop run --until-done [--model M] [--max N] — autonomous atoms, fresh Pi session per atom\n" +
+                "/loop resume — next atom in a fresh Pi session (clean context)\n" +
                 "/loop status | /loop stats | /loop finish | /loop stop | /loop end\n\n" +
                 "Every implementation atom requires focused tests.\n" +
                 "Prefer 2–3 distinct positive and 2–3 distinct negative/error scenarios when meaningful.\n" +
@@ -3118,56 +2941,50 @@ function goalSummaryText(): string {
 
           /**
            * Convenience:
-           * /loop <goal>
+           * /loop <goal>  ===  /loop goal <goal>
+           *
+           * Sets the goal and configuration only — starts nothing.
+           * The start is always explicit:
+           *   /loop prepare   (optional; a model writes GOAL.md)
+           *   /loop run       (one atom in a fresh Pi session)
            */
-          const parsed =
-            parseStartArgs(
-              trimmed,
-            );
-
-          applyGoalConfig(
-            parsed,
-          );
-
-          const gitReady =
-            await ensureGitRepository(
-              ctx,
-            );
-
-          if (!gitReady.ok) {
+          if (
+            state.active
+          ) {
             ctx.ui.notify(
-              `Loop stopped: ${gitReady.reason}`,
+              "Loop is running. Use /loop stop first.",
               "error",
             );
             return;
           }
 
+          const parsed =
+            parseStartArgs(
+              trimmed,
+            );
+
           if (
-            state.loopModel &&
-            !(
-              await switchModel(
-                pi,
-                ctx,
-                state.loopModel,
-              )
-            )
+            !parsed.description
           ) {
+            ctx.ui.notify(
+              'Usage: /loop <goal> [--delay S] [--check "CMD"] [--check-timeout S] [--model M] [--rescue-model M] [--until-done] [--max N]',
+              "error",
+            );
             return;
           }
 
-          if (
-            state.untilDone
-          ) {
-            await startFreshAutonomousSession(
-              ctx,
-            );
-          } else {
-            runLoop(
-              pi,
-              ctx,
-              "start",
-            );
-          }
+          applyGoalConfig(
+            parsed,
+          );
+
+          persistState(
+            pi,
+          );
+
+          ctx.ui.notify(
+            `Goal set:\n${goalSummaryText()}\n\nNext: /loop prepare, then /loop run.`,
+            "info",
+          );
         },
     },
   );

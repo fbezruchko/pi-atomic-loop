@@ -115,39 +115,43 @@ The idea: **decouple planning and execution.** An expensive, strong model writes
 
 ## 3. Core concept
 
-The loop works like this:
+The loop works like this (atomic coding cycles):
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  /loop start <goal>                                 │
-└──────────────────┬──────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│ /loop goal <goal>  → sets the goal, starts nothing        │
+│ /loop prepare      → a (strong) model writes GOAL.md      │
+│ /loop run          → one atom in a FRESH Pi session       │
+└──────────────────┬────────────────────────────────────────┘
                    ▼
-        ┌─── Loop iteration ────────────────────┐
-        │ 1. Loop prompt sent to the model      │
-        │    (goal, criteria, rules,            │
-        │     check status, iteration counter)  │
-        │ 2. Model does ONE concrete            │
-        │    progress batch (tools, edits)      │
-        │ 3. Goal check runs (if --check)       │
-        │ 4. Evaluation:                        │
-        │    Error? → retry with backoff        │
-        │    Repetition? → stuck strategy       │
-        │    Regression? → fix prompt           │
-        │    Done? → keep improving             │
-        │      (or stop with --until-done)      │
-        │    Otherwise → next iteration         │
-        └───────────────┬───────────────────────┘
-                        │ (until /loop stop)
+        ┌─── One Pi session = exactly one atom ─────────────┐
+        │ 1. Fresh session: clean context, only the durable │
+        │    handoff (loop state) + the task instruction    │
+        │ 2. Model reads GOAL.md / PROGRESS.md /            │
+        │    TESTMANUAL.md and works on exactly ONE atomic  │
+        │    task with focused tests                        │
+        │ 3. Goal check runs (if --check)                   │
+        │ 4. Evaluation:                                    │
+        │    Error? → retry the same atom (backoff)         │
+        │    Repetition? → stuck strategy                   │
+        │    Regression? → suspend, fix the older atom      │
+        │    Atom done? → git checkpoint, session stops     │
+        └───────────────┬───────────────────────────────────┘
                         ▼
+   supervised:  wait for the operator (/loop resume starts
+                the next atom in yet another fresh session)
+   autonomous (--until-done): the controller creates the next
+                fresh Pi session automatically, until the goal
+                check passes or the MVP is reached
 ```
 
 **Core principles:**
 
-- **Small iterations**: every response max. 1,200 characters, one progress batch per turn. This keeps context small so pi's normal compaction keeps working for days.
-- **Endless by default**: no iteration cap. `LOOP_DONE:` from the model does *not* stop the loop — instead it continues with improvement work (features, tests, bug fixes, refactoring, docs).
-- **Never wait for a human**: missing information → the model makes a documented assumption (`ASSUMPTIONS.md`) and keeps working.
+- **One atom per session**: one Pi session works on exactly one atomic task, then stops. The next atom gets a *genuinely fresh* Pi session — conversation history is never durable state, so weak/local models cannot drift on stale context.
+- **Durable handoff**: `GOAL.md`, `PROGRESS.md`, `TESTMANUAL.md`, `ASSUMPTIONS.md`, `IMPROVEMENTS.md` plus Git checkpoints carry everything across sessions.
+- **Decouple planning and execution**: a strong model writes the specification once (`/loop prepare`); a cheap or local model works through it (`/loop run`).
 - **Objective truth**: with `--check`, a shell command decides progress and completion — not the model's self-assessment.
-- **Persistence**: loop state lives in the session. After a pi restart/reload, an active loop automatically resumes after 3 seconds.
+- **Persistence**: loop state lives in session entries; the fresh-session handoff marker lets the controller recognize its own replacement sessions.
 
 ---
 
@@ -158,10 +162,10 @@ The loop works like this:
 | `/loop goal <goal> [flags]` | Set goal + configuration **without starting**. |
 | `/loop goal` | Show the current goal and configuration. |
 | `/loop prepare [--model M] [--file F]` | Have a (strong) model write the specification (`GOAL.md`) + check script. |
-| `/loop run [--model M]` | Start the loop — optionally with a different model than used for preparation. |
-| `/loop start <goal> [flags]` | Shortcut: set goal + start immediately (one step). |
-| `/loop <goal>` | Short form of `/loop start <goal>`. |
-| `/loop resume [--max N] [--check "CMD"] [--model M] [--rescue-model M]` | Continue a stopped/paused loop, optionally with a new cap/check/model. |
+| `/loop run [--model M]` | Start the loop in a **fresh Pi session** (clean context) — optionally with a different model than used for preparation. |
+| `/loop start <goal> [flags]` | Shortcut: set goal + start immediately (one step, fresh Pi session). |
+| `/loop <goal>` | Short form of `/loop goal <goal>` — sets the goal and configuration, **starts nothing**. |
+| `/loop resume [--max N] [--check "CMD"] [--model M] [--rescue-model M]` | Continue a stopped/paused loop in a **fresh Pi session** (clean context), optionally with a new cap/check/model. |
 | `/loop status` | Show the full state. |
 | `/loop stats` | Statistics from the iteration log (`.pi-loop-log.jsonl`): events, interventions, productive iterations/h, score trend. |
 | `/loop finish` | Soft stop: the current iteration completes, then no new turn (state preserved for `/loop resume`). Alias: `/loop soft-stop`. |
