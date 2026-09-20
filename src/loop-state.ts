@@ -1,3 +1,5 @@
+import type { StartArgs } from "./arguments.ts";
+
 export const STATE_ENTRY_TYPE =
   "loop-state";
 
@@ -103,6 +105,82 @@ export interface LoopState {
 
   status: LoopStatus;
   lastNotice: string;
+}
+
+/**
+ * State overrides for /loop run and /loop resume.
+ *
+ * Switching to autonomous mode (--until-done) clears the supervised
+ * single-atom cap (maxIterations === 1 left behind by a non-untilDone
+ * start): with --until-done the chain must run until done, and only an
+ * explicit --max on the same command limits it. Without this, the
+ * fresh-session continuation stops after every atom with "Autonomous
+ * atom limit reached (1)" and never starts the next fresh session.
+ */
+/** Returns an operator notice when a limit removal happened. */
+export function applyRunOverrides(
+  state: LoopState,
+  parsed: StartArgs,
+): string | undefined {
+  let notice:
+    | string
+    | undefined;
+
+  if (
+    parsed.model
+  ) {
+    state.loopModel =
+      parsed.model;
+  }
+
+  if (
+    parsed.rescueModel
+  ) {
+    state.rescueModel =
+      parsed.rescueModel;
+  }
+
+  if (
+    parsed.maxIterations >
+      0
+  ) {
+    state.maxIterations =
+      parsed.maxIterations;
+  }
+
+  if (
+    parsed.untilDone
+  ) {
+    state.untilDone =
+      true;
+
+    /** 0 = unlimited; explicit --max on the same command wins. */
+    state.maxIterations =
+      parsed.maxIterations;
+  }
+
+  /**
+   * Documented behavior: when the atom cap is already exhausted, a plain
+   * /loop run or /loop resume continues UNLIMITED (with a notice) instead
+   * of re-pausing after every single atom.
+   */
+  if (
+    !parsed.untilDone &&
+    parsed.maxIterations ===
+      0 &&
+    state.maxIterations >
+      0 &&
+    state.atomsCompletedThisRun >=
+      state.maxIterations
+  ) {
+    state.maxIterations =
+      0;
+
+    notice =
+      "Atom limit exhausted — continuing without a cap.";
+  }
+
+  return notice;
 }
 
 export function defaultState(): LoopState {

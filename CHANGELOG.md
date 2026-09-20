@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7
+
+- **Fixed: the autonomous chain stopped after every atom** when switching into autonomous mode via `/loop run --until-done` (or `/loop resume --until-done`) after a supervised setup. `/loop goal` stores `maxIterations = 1` (the supervised single-atom cap) and the mode flip only set `untilDone = true`, so the fresh-session continuation hit `Autonomous atom limit reached (1)` right after each completed atom — while the turn-end notice still promised "a fresh Pi session for the next atom". Now `--until-done` clears that cap unless an explicit `--max N` is passed on the same command (new `applyRunOverrides()` in `src/loop-state.ts`).
+- **The limit stop is no longer silent**: when the autonomous chain stops at an explicit `--max`, the operator now gets a warning notification and the loop status changes to `Atom limit reached (N)`.
+- **Real test suite**: `npm test` now runs `tests/run-overrides.test.ts` (Node test runner, regression tests for the bug above).
+
 ## 1.0.6 — Documentation cleanup and localization
 
 - **Documentation localization**: the German version (`DOCUMENTATION_de.md`) is removed; a **Russian** version (`DOCUMENTATION_ru.md`) is added as an alternative to the English main documentation. All future documentation is English-first.

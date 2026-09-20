@@ -28,6 +28,7 @@ import {
 } from "../src/loop-log.ts";
 
 import {
+  applyRunOverrides,
   defaultState,
   persistedLoopState,
   restoreLoopState,
@@ -2256,6 +2257,17 @@ async function startFreshAtomSession(
               logIteration(
                 "max_reached",
               );
+
+              freshCtx.ui.notify(
+                state.lastNotice,
+                "warning",
+              );
+
+              freshCtx.ui.setStatus(
+                "loop",
+                `Atom limit reached (${state.maxIterations})`,
+              );
+
               return;
             }
 
@@ -2711,33 +2723,19 @@ function goalSummaryText(): string {
                 remainder,
               );
 
-            if (
-              parsed.model
-            ) {
-              state.loopModel =
-                parsed.model;
-            }
+            const runNotice =
+              applyRunOverrides(
+                state,
+                parsed,
+              );
 
             if (
-              parsed.rescueModel
+              runNotice
             ) {
-              state.rescueModel =
-                parsed.rescueModel;
-            }
-
-            if (
-              parsed.maxIterations >
-              0
-            ) {
-              state.maxIterations =
-                parsed.maxIterations;
-            }
-
-            if (
-              parsed.untilDone
-            ) {
-              state.untilDone =
-                true;
+              ctx.ui.notify(
+                runNotice,
+                "info",
+              );
             }
 
             const gitReady =
@@ -2805,33 +2803,19 @@ function goalSummaryText(): string {
                 remainder,
               );
 
-            if (
-              parsed.model
-            ) {
-              state.loopModel =
-                parsed.model;
-            }
+            const runNotice =
+              applyRunOverrides(
+                state,
+                parsed,
+              );
 
             if (
-              parsed.rescueModel
+              runNotice
             ) {
-              state.rescueModel =
-                parsed.rescueModel;
-            }
-
-            if (
-              parsed.maxIterations >
-              0
-            ) {
-              state.maxIterations =
-                parsed.maxIterations;
-            }
-
-            if (
-              parsed.untilDone
-            ) {
-              state.untilDone =
-                true;
+              ctx.ui.notify(
+                runNotice,
+                "info",
+              );
             }
 
             const gitReady =
