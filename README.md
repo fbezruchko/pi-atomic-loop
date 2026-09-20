@@ -2,7 +2,7 @@
 
 > **Atomic coding cycles** for [pi](https://github.com/earendil-works/pi) — supervised or autonomous, with **one genuinely fresh Pi session per atom** (conversation history is never durable state).
 >
-> **Full documentation with examples: [DOCUMENTATION.md](DOCUMENTATION.md)** (deutsche Übersetzung: [DOCUMENTATION_de.md](DOCUMENTATION_de.md))
+> **Full documentation with examples: [DOCUMENTATION.md](DOCUMENTATION.md)** (Russian translation: [DOCUMENTATION_ru.md](DOCUMENTATION_ru.md))
 
 Pi package for **atomic coding cycles**: decompose a goal into tiny observable atoms and work on exactly one atom per Pi session, then stop so the operator can test and give feedback. Default is **supervised** (one atom per operator-driven cycle); enable `--until-done` for **autonomous** mode, which runs until an MVP with a new Pi session per atom. Works with commercial and open-source models alike.
 
@@ -139,19 +139,13 @@ Score ideas: number of passing tests, test coverage, implemented endpoints, `-` 
 From git (recommended for now):
 
 ```bash
-pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.6
 ```
 
 Or from a local checkout:
 
 ```bash
 pi install /path/to/pi-atomic-loop
-```
-
-Or from npm (once published):
-
-```bash
-pi install npm:pi-atomic-loop
 ```
 
 Then start or reload pi and run `/loop help`.
@@ -165,7 +159,7 @@ pi-atomic-loop/
 ├── package.json
 ├── README.md                 # This file
 ├── DOCUMENTATION.md          # Full documentation with examples (English)
-├── DOCUMENTATION_de.md       # German translation
+├── DOCUMENTATION_ru.md       # Russian translation
 ├── CHANGELOG.md
 ├── LICENSE                   # GNU AGPL v3.0 only
 ├── extensions/index.ts       # Pi command/event orchestration

@@ -1,6 +1,6 @@
 # Loop Module — Documentation
 
-> Deutsche Version: [DOCUMENTATION_de.md](DOCUMENTATION_de.md)
+> Русская версия: [DOCUMENTATION_ru.md](DOCUMENTATION_ru.md)
 
 Unattended loop mode for [pi](https://github.com/earendil-works/pi): you give the agent **one goal** and it works on it in small iterations — for hours or days — until **you** stop it. Works with commercial models (Claude, GPT, Gemini) as well as open-source models (Qwen, GLM, gpt-oss, …), because the loop itself is hardened against the typical weaknesses of weaker models: repetition loops, false "done" claims, provider failures.
 
@@ -28,19 +28,13 @@ Unattended loop mode for [pi](https://github.com/earendil-works/pi): you give th
 From git (recommended for now):
 
 ```bash
-pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.6
 ```
 
 Or from a local checkout:
 
 ```bash
 pi install /path/to/pi-atomic-loop
-```
-
-Or from npm (once published):
-
-```bash
-pi install npm:pi-atomic-loop
 ```
 
 Then restart pi or run `/reload`. The `/loop` command is now available.
@@ -52,7 +46,7 @@ pi-atomic-loop/
 ├── package.json              # pi package definition
 ├── README.md                 # Overview
 ├── DOCUMENTATION.md          # This file
-├── DOCUMENTATION_de.md       # German translation
+├── DOCUMENTATION_ru.md       # Russian translation
 ├── CHANGELOG.md              # Version history
 ├── LICENSE                   # GNU AGPL v3.0 only
 ├── extensions/index.ts       # Pi command/event orchestration
