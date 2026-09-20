@@ -14,6 +14,9 @@ export interface StartArgs {
   model: string;
   rescueModel: string;
   goalFile: string;
+
+  /** prepare: skip the plan dialogue and use defaults (mvp + weak). */
+  quick: boolean;
 }
 
 function extractCheckCommand(text: string): {
@@ -97,6 +100,7 @@ export function parseStartArgs(
   let model = "";
   let rescueModel = "";
   let goalFile = "";
+  let quick = false;
 
   const kept: string[] = [];
 
@@ -285,6 +289,13 @@ export function parseStartArgs(
     }
 
     if (
+      token === "--quick"
+    ) {
+      quick = true;
+      continue;
+    }
+
+    if (
       token === "--mode" &&
       tokens[i + 1]
     ) {
@@ -368,5 +379,6 @@ export function parseStartArgs(
     model,
     rescueModel,
     goalFile,
+    quick,
   };
 }

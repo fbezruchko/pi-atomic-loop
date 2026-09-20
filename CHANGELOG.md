@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+
+- **Plan dialogue in `/loop prepare`**: before writing the plan, the model now runs the new `atom-planning` skill — it interviews the user about implementation details (one question at a time, via `ask_user`), determines the expected solution complexity (`Complexity: mvp | standard | design`) and the implementing model class (`Model tier: strong | weak`). Both decisions are recorded in `GOAL.md` together with a new **Atom sizing** section: a strong-model plan uses larger cohesive atoms (several files allowed), a weak-model plan stays on tiny micro-atoms. The tier never changes `--model`; it only sizes atoms. Every atom session now respects the Atom sizing section when judging whether an atom is small enough.
+- **`/loop prepare --quick`**: skips the dialogue and uses the old behavior as defaults (mvp + weak).
+
 ## 1.0.4
 
 - **Hide the `Loop …` footer label when no cycle is active.** The extension set the status bar unconditionally on every `session_start`, so plain sessions (and new ones) always showed `Loop SUPERVISED` even though nothing was running. The label is now shown only while a cycle is active and cleared on `session_start` (inactive), `/loop stop`, `/loop end`, and the git-blocked abort path.

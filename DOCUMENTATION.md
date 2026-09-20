@@ -106,7 +106,7 @@ That's all you need for basic operation.
 | Phase | Command | What happens | Typical model |
 |-------|---------|--------------|---------------|
 | **1. Set goal** | `/loop goal <goal> [flags]` | Stores goal + configuration. **Starts nothing.** | — (no LLM call) |
-| **2. Prepare** (optional) | `/loop prepare [--model M]` | A model analyzes the project and writes `GOAL.md` (specification, milestones, assumptions) plus a check script. Ends with `GOAL_READY:`. You can then review and edit `GOAL.md`. | Strong model (Opus, GPT-5, …) |
+| **2. Prepare** (optional) | `/loop prepare [--model M] [--quick]` | A model interviews you about the plan (implementation details, complexity `mvp/standard/design`, model tier `strong/weak` — see the `atom-planning` skill), analyzes the project and writes `GOAL.md` (specification, atom sizing, milestones) plus a check script. Ends with `GOAL_READY:`. You can then review and edit `GOAL.md`. `--quick` skips the dialogue (defaults: mvp + weak). | Strong model (Opus, GPT-5, …) |
 | **3. Run the loop** | `/loop run [--model M]` | Starts the actual endless loop. The first iteration reads `GOAL.md` as the specification. | Cheap/local model (Qwen, GLM, Sonnet, …) |
 
 The idea: **decouple planning and execution.** An expensive, strong model writes a precise specification once — a cheap or local model works through it for days. `GOAL.md` lives in the project, survives compaction/restarts, and is referenced in every loop prompt ("read it whenever you lose track of the plan").
@@ -161,7 +161,7 @@ The loop works like this (atomic coding cycles):
 |---------|-------------|
 | `/loop goal <goal> [flags]` | Set goal + configuration **without starting**. |
 | `/loop goal` | Show the current goal and configuration. |
-| `/loop prepare [--model M] [--file F]` | Have a (strong) model write the specification (`GOAL.md`) + check script. |
+| `/loop prepare [--model M] [--file F] [--quick]` | Plan dialogue with you (details, complexity level, model tier), then a (strong) model writes the specification (`GOAL.md`) + check script. `--quick` skips the dialogue. |
 | `/loop run [--model M]` | Start the loop in a **fresh Pi session** (clean context) — optionally with a different model than used for preparation. |
 | `/loop start <goal> [flags]` | Shortcut: set goal + start immediately (one step, fresh Pi session). |
 | `/loop <goal>` | Short form of `/loop goal <goal>` — sets the goal and configuration, **starts nothing**. |
@@ -185,6 +185,7 @@ The loop works like this (atomic coding cycles):
 | `--model M` | Model for this phase: `provider/id` (e.g. `anthropic/claude-opus-4-6`) or a unique id substring (e.g. `qwen3-coder`). |
 | `--rescue-model M` | Stronger model that takes over for **one** cleanup turn after 3 consecutive stuck interventions (see [section 7](#7-error-and-failure-handling)). |
 | `--until-done` | Loop stops on verified completion. |
+| `--quick` | `prepare` only: skip the plan dialogue; use defaults (`Complexity: mvp`, `Model tier: weak`). |
 
 **Goal syntax:** everything before `Done when:` is the goal, everything after are the criteria:
 
@@ -224,8 +225,9 @@ If the loop model gets stuck 3 times in a row, the rescue model takes over for e
 
 `/loop prepare` sends a one-time task to the model (not a loop!):
 
+0. **Plan dialogue** (`atom-planning` skill): the model interviews you — clarifying questions about the implementation (one at a time), then two mandatory questions: expected solution complexity (`Complexity: mvp | standard | design`) and which class of model will implement the atoms (`Model tier: strong | weak`). The tier only sizes the atoms (strong → larger cohesive atoms, weak → tiny micro-atoms); it never changes `--model`. Skip with `--quick` (defaults: mvp + weak).
 1. Inspect the project state (files, README, tests).
-2. Write `GOAL.md`: refined objective, scope & non-goals, measurable completion criteria, a milestone roadmap of small steps, quality standards (tests, docs, git commits), explicit assumptions.
+2. Write `GOAL.md`: `Complexity:` / `Model tier:` lines right below "## Original User Request", an **Atom sizing** section stating the chosen granularity, refined objective, scope & non-goals, measurable completion criteria, a milestone roadmap of small steps, quality standards (tests, docs, git commits), explicit assumptions.
 3. If objectively checkable: create a check script (`check.sh`) and reference it in `GOAL.md`.
 4. Finish with `GOAL_READY: <summary>` — this is how the extension detects that preparation is complete and recommends the exact `--check` command.
 

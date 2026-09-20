@@ -703,6 +703,7 @@ function loopInstructions(
     "3. Read TESTMANUAL.md when present.",
     "4. Select exactly one atomic task.",
     "5. Work only on that task.",
+    `6. Respect the Atom sizing section in ${state.goalFile}: if the selected atom is larger than the sizing rule allows, split it first.`,
 
     "",
     "TEST REQUIREMENTS:",
@@ -760,8 +761,8 @@ function loopInstructions(
   );
 }
 
-function prepareInstructions(): string {
-  return [
+function prepareInstructions(quick = false): string {
+  const lines: string[] = [
     "Prepare the loop specification. DO NOT implement project functionality.",
 
     "",
@@ -773,13 +774,58 @@ function prepareInstructions(): string {
     }`,
 
     "",
-    "The coding model may be weak/local.",
+  ];
 
-    "Therefore the roadmap MUST be decomposed into extremely small atomic tasks.",
+  if (!quick) {
+    lines.push(
+      "STEP 0 — PLAN DIALOGUE (mandatory, before writing anything):",
 
-    "",
+      "Use the atom-planning skill and interview the user first.",
+
+      "1. Explore the project context (files, docs, recent commits).",
+
+      "2. Ask clarifying questions about the intended implementation, one at a time (use ask_user with options when possible).",
+
+      "3. Determine the expected solution complexity and record it as:",
+
+      "   Complexity: <mvp | standard | design>",
+
+      "   - mvp — throwaway \"quick-quick\" build: no architecture, fastest working version",
+      "   - standard — normal structure with modest, pragmatic design decisions",
+      "   - design — full engineering: architecture, interfaces and docs come first",
+
+      "4. Determine which class of model will implement the atoms and record it as:",
+
+      "   Model tier: <strong | weak>",
+
+      "   The tier only sizes the atoms; the actual model is chosen separately via --model.",
+
+      "Skip a question only if the user already answered it explicitly.",
+
+      "",
+      "SIZING RULE for the plan and the ATOM SIZING section:",
+
+      "- Model tier strong → atoms may be larger: one cohesive change, several files allowed.",
+      "- Model tier weak → atoms must stay extremely small: one tiny behavior in one or two files.",
+
+      "",
+    );
+  } else {
+    lines.push(
+      "Plan dialogue was skipped (--quick).",
+
+      "Use the defaults: Complexity: mvp, Model tier: weak.",
+
+      "The coding model may be weak/local.",
+
+      "Therefore the roadmap MUST be decomposed into extremely small atomic tasks.",
+
+      "",
+    );
+  }
+
+  lines.push(
     "Every implementation atom must contain:",
-
     "### A001 — <short name>",
     "Status: OPEN",
     "Goal: <one concrete behavior/change>",
@@ -807,7 +853,7 @@ function prepareInstructions(): string {
 
     "Create a sequential task queue.",
 
-    "The first OPEN task must be immediately actionable by a weak coding model.",
+    "The first OPEN task must be immediately actionable at the chosen Atom sizing granularity.",
 
     "",
     "REGRESSION POLICY:",
@@ -828,6 +874,15 @@ function prepareInstructions(): string {
 
     'At the very top write "## Original User Request" and preserve the initiating request exactly.',
 
+    "Directly below it record the plan decisions:",
+    "- Complexity: <mvp | standard | design>",
+    "- Model tier: <strong | weak>",
+
+    "",
+    "Add an \"## Atom sizing\" section stating the chosen atom granularity",
+    "(cohesive multi-file atoms for a strong model, one-tiny-behavior micro-atoms for a weak model).",
+    "Every atom session must respect that section when judging whether an atom is small enough.",
+
     "",
     "Update PROGRESS.md with:",
     "- MVP state",
@@ -844,7 +899,9 @@ function prepareInstructions(): string {
 
     "",
     "End with GOAL_READY: <one-line summary>.",
-  ].join(
+  );
+
+  return lines.join(
     "\n",
   );
 }
@@ -2592,7 +2649,9 @@ function goalSummaryText(): string {
             );
 
             ctx.ui.notify(
-              `Preparing ${state.goalFile} with atomic decomposition…`,
+              parsed.quick
+                ? `Preparing ${state.goalFile} (quick, no dialogue)…`
+                : `Interviewing you about the plan (atom-planning), then writing ${state.goalFile}…`,
               "info",
             );
 
@@ -2602,7 +2661,7 @@ function goalSummaryText(): string {
                   MESSAGE_TYPE,
 
                 content:
-                  prepareInstructions(),
+                  prepareInstructions(parsed.quick),
 
                 display:
                   true,
@@ -2940,7 +2999,7 @@ function goalSummaryText(): string {
             ctx.ui.notify(
               "Loop workflow:\n" +
                 "/loop <goal> or /loop goal <goal> — set the goal, starts nothing\n" +
-                "/loop prepare [--model M]\n" +
+                "/loop prepare [--model M] [--quick] — plan dialogue (atom-planning) then GOAL.md; --quick skips the dialogue (mvp + weak)\n" +
                 "/loop run [--model M] — one atom in a fresh Pi session (clean context)\n" +
                 "/loop run --until-done [--model M] [--max N] — autonomous atoms, fresh Pi session per atom\n" +
                 "/loop resume — next atom in a fresh Pi session (clean context)\n" +
