@@ -46,6 +46,7 @@ Then determine the task in this order:
 1. **Current atom:** if `PROGRESS.md` or durable loop state identifies an incomplete `Current atom`, continue that atom. Do NOT skip it merely because its `GOAL.md` status is not `OPEN`.
 2. **Regression:** if regression state is active, work only on the regression task and its required retests.
 3. **OPEN atom:** only when there is no incomplete current atom and no active regression, choose the first relevant `OPEN` atom from `GOAL.md`.
+   - **Acceptance:** If you choose an `OPEN` atom, first verify if the task is actually already completed (e.g. by running tests or checking files). If it is completed, mark it as `COMPLETED` in `PROGRESS.md` and move to the next atom. If it is not completed, proceed with implementation.
 
 Never spend the turn re-checking already completed atoms just to decide what to do when a current atom is explicitly recorded.
 
