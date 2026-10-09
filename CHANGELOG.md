@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.8
+
+- **Fix: missing acceptance check for OPEN atoms.** Agents are now instructed to verify if an `OPEN` atom is already completed (e.g. via tests or checking files) before starting it. If completed, the atom is marked as `COMPLETED` in `PROGRESS.md` and the agent moves to the next task. This prevents redundant work and potential loops in clean sessions.
+
 ## 1.0.7
 
 - **Fixed: the autonomous chain stopped after every atom** when switching into autonomous mode via `/loop run --until-done` (or `/loop resume --until-done`) after a supervised setup. `/loop goal` stores `maxIterations = 1` (the supervised single-atom cap) and the mode flip only set `untilDone = true`, so the fresh-session continuation hit `Autonomous atom limit reached (1)` right after each completed atom — while the turn-end notice still promised "a fresh Pi session for the next atom". Now `--until-done` clears that cap unless an explicit `--max N` is passed on the same command (new `applyRunOverrides()` in `src/loop-state.ts`).
@@ -43,5 +47,3 @@
 - **Install**: from git (`pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.0`) or a local path.
 
 ---
-
-
