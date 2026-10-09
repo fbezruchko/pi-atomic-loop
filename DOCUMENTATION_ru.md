@@ -28,7 +28,7 @@
 Из git (рекомендуется сейчас):
 
 ```bash
-pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.6
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.7
 ```
 
 Или из локального клона:

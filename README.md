@@ -139,7 +139,7 @@ Score ideas: number of passing tests, test coverage, implemented endpoints, `-` 
 From git (recommended for now):
 
 ```bash
-pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.6
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.7
 ```
 
 Or from a local checkout:

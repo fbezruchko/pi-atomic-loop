@@ -284,7 +284,7 @@ export function buildEmergencyCompaction(
   const finalDirection =
     state.regressionActive
       ? "\n\n## Next Step\nRegression mode is active. Do NOT start or resume a new feature. Read the regression task in PROGRESS.md, fix the regression, run its focused regression test, then retest every affected completed atom listed above. Do not resume the suspended atom until the required retests pass and the regression is resolved."
-      : `\n\n## Next Step\nRe-establish bearings from the working tree. Read ${state.goalFile}, PROGRESS.md and TESTMANUAL.md. If a current atom exists, resume that atom. Otherwise select the first relevant OPEN atom. Perform exactly one atomic task.`;
+      : `\n\n## Next Step\nRe-establish bearings from the working tree. Read ${state.goalFile}, PROGRESS.md and TESTMANUAL.md. If a current atom exists, resume that atom (if status is SPLIT, resume the first relevant OPEN sub-atom). Otherwise select the first relevant OPEN atom. Perform exactly one atomic task.`;
 
   const body =
     `## Goal\n` +

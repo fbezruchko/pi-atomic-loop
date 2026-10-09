@@ -72,7 +72,7 @@ Refactor the backend.
 Implement the entire API.
 ```
 
-If the current atom is still too large, split it into smaller atoms in `GOAL.md`/`PROGRESS.md` before implementing it.
+If the current atom is still too large, it should be split into smaller atoms (sub-atoms) in `GOAL.md`/`PROGRESS.md` before implementation.
 
 ## Scope
 
@@ -82,23 +82,23 @@ Do not fix unrelated bugs, refactor unrelated code, add adjacent functionality, 
 
 A newly discovered bug in an older atom is NOT unrelated: it becomes a regression and takes priority over the current feature.
 
-## Implementation-first workflow
+## Splitting Atoms
 
-For weak coding models, do NOT begin by spending the whole turn writing tests.
+If a task is too large to be completed in a single session, or if the implementation plan is too complex, split the atom into sub-atoms.
 
-Use this order:
+1. **Identify complexity:** If implementation requires multiple distinct steps that could each be a single atom.
+2. **Split protocol:**
+   - Update `PROGRESS.md`: mark the current atom as `SPLIT`.
+   - Add a list of sub-atoms with `OPEN` status using the `[ParentID].[SubID]` numbering (e.g., `001.1`, `001.2`).
+   - Pick the first sub-atom and begin work on it.
 
-```text
-1. Understand the atom and acceptance criterion.
-2. Implement the smallest plausible code change.
-3. Verify the implementation works with the simplest available executable/smoke check.
-4. Only after basic behavior works, write/update the focused automated tests.
-5. Run the focused tests.
-6. Fix failures caused by the implementation or tests.
-7. Update PROGRESS.md and TESTMANUAL.md.
-```
+## Sub-atom Completion
 
-### Basic verification
+When a sub-atom is completed:
+
+1. **Update `PROGRESS.md`**: Mark the sub-atom as `COMPLETED`.
+2. **Parent status**: If it was the last sub-atom, mark the parent atom as `COMPLETED`.
+3. **End session**: Signal completion of the current sub-atom task. This allows the controller to start a fresh session for the next sub-atom or the next main atom.
 
 Prefer the cheapest real verification available:
 
@@ -274,7 +274,8 @@ On the next session:
 
 ```text
 Current atom exists and incomplete
-→ resume CURRENT atom
+→ If status is SPLIT, resume the first relevant OPEN sub-atom
+→ Otherwise, resume CURRENT atom
 
 No current atom
 → choose first relevant OPEN atom
