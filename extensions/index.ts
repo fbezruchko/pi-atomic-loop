@@ -31,10 +31,26 @@ import {
   applyRunOverrides,
   defaultState,
   persistedLoopState,
+  resetInteractiveBatch,
   restoreLoopState,
   STATE_ENTRY_TYPE,
+  stopInteractive,
   type LoopState,
 } from "../src/loop-state.ts";
+
+import {
+  interactiveStatusLines,
+  interactiveSystemNote,
+  planHash,
+  shortSha,
+} from "../src/interactive.ts";
+
+import {
+  collectBatchFacts,
+  countDrift,
+  ensureInteractiveBaseline,
+  type GitRunner,
+} from "../src/interactive-git.ts";
 
 import {
   contentToText,
@@ -58,6 +74,12 @@ export type {
 } from "../src/repetition.ts";
 
 const MESSAGE_TYPE = "loop";
+
+const INTERACTIVE_JOURNAL_FILE =
+  "INTERACTIVE-JOURNAL.md";
+
+const INTERACTIVE_PLAN_FILE =
+  ".pi-loop/interactive-commit-plan.md";
 
 const BASE_BACKOFF_SECONDS = 5;
 const MAX_BACKOFF_SECONDS = 300;
@@ -466,6 +488,10 @@ function applyGoalConfig(
 }
 
 function loopModeText(): string {
+  if (state.interactive) {
+    return "INTERACTIVE";
+  }
+
   return state.untilDone
     ? "AUTONOMOUS"
     : "SUPERVISED";
@@ -1015,6 +1041,12 @@ function scheduleLoopTurn(
 }
 
 function statusBarText(): string {
+  if (state.interactive) {
+    return `Loop INTERACTIVE · ${
+      state.description.slice(0, 40) || "-"
+    }`;
+  }
+
   const atom =
     state.currentAtomId
       ? ` · ${state.currentAtomId}`
@@ -1040,6 +1072,110 @@ function statusBarText(): string {
 
   return (
     `Loop ${loopModeText()}${atom}${regression}${check}`
+  );
+}
+
+function gitRunner(
+  ctx: ExtensionContext,
+): GitRunner {
+  return (args, timeout) =>
+    gitExec(ctx, args, timeout);
+}
+
+async function ensureInteractiveJournal(
+  ctx: ExtensionContext,
+): Promise<void> {
+  const timestamp =
+    new Date().toISOString();
+
+  await piGlobal!.exec(
+    "bash",
+    [
+      "-lc",
+      'if [ ! -f INTERACTIVE-JOURNAL.md ]; then printf "# Interactive journal\\n" > INTERACTIVE-JOURNAL.md; fi; printf "\\n## Batch %s\\n" "$1" >> INTERACTIVE-JOURNAL.md',
+      "pi-loop-journal",
+      timestamp,
+    ],
+    { timeout: 10_000 },
+  );
+}
+
+async function startInteractive(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  parsed: StartArgs,
+): Promise<void> {
+  const gitReady =
+    await ensureGitRepository(ctx);
+
+  if (!gitReady.ok) {
+    state.active = false;
+    state.status = "paused";
+    state.lastNotice = gitReady.reason;
+    persistState(pi);
+    ctx.ui.notify(
+      `Loop stopped: ${gitReady.reason}`,
+      "error",
+    );
+    return;
+  }
+
+  const baseline =
+    await ensureInteractiveBaseline(
+      gitRunner(ctx),
+    );
+
+  if (!baseline.ok) {
+    state.active = false;
+    state.status = "paused";
+    state.lastNotice = baseline.reason;
+    persistState(pi);
+    ctx.ui.notify(
+      `Interactive mode failed: ${baseline.reason}`,
+      "error",
+    );
+    return;
+  }
+
+  await ensureInteractiveJournal(ctx);
+
+  state.interactive = true;
+  state.interactiveBaselineSha = baseline.sha;
+  state.interactiveStartedAt = Date.now();
+  resetInteractiveBatch(state);
+  state.active = false;
+  state.status = "stopped";
+  state.softStopRequested = false;
+  state.lastNotice = "Interactive mode started.";
+
+  persistState(pi);
+
+  if (
+    parsed.model &&
+    !(await switchModel(
+      pi,
+      ctx,
+      parsed.model,
+    ))
+  ) {
+    return;
+  }
+
+  ctx.ui.setStatus(
+    "loop",
+    statusBarText(),
+  );
+
+  logIteration(
+    "interactive_start",
+    { baseline: baseline.sha },
+  );
+
+  ctx.ui.notify(
+    `Interactive mode started at ${shortSha(
+      baseline.sha,
+    )}. Work normally; run /loop commit when the batch is ready.`,
+    "info",
   );
 }
 
@@ -1519,6 +1655,7 @@ const LOOP_LOG_REPO_PATHS = new Set([
   "pi-loop-log.jsonl",
   ".pi-loop-log.jsonl.1",
   "pi-loop-log.jsonl.1",
+  normalizeRepoPath(INTERACTIVE_PLAN_FILE),
 ]);
 
 function isLoopOwnedPath(
@@ -2387,9 +2524,7 @@ function goalSummaryText(): string {
     }`,
 
     `Mode: ${
-      state.untilDone
-        ? "AUTONOMOUS"
-        : "SUPERVISED"
+      loopModeText()
     }`,
 
     "Atoms per Pi session: 1",
@@ -2471,7 +2606,7 @@ function goalSummaryText(): string {
     "loop",
     {
       description:
-        "Atomic loop: every atom runs in a fresh Pi session. /loop <goal> sets the goal; /loop prepare writes GOAL.md; /loop run works one atom; --until-done = autonomous until done.",
+        "Atomic loop: every atom runs in a fresh Pi session. /loop <goal> sets the goal; /loop prepare writes GOAL.md; /loop run works one atom; --until-done = autonomous until done; --interactive = user-driven batch with /loop commit.",
 
       handler:
         async (
@@ -2497,6 +2632,59 @@ function goalSummaryText(): string {
               .join(" ")
               .trim();
 
+          const interactiveSafe =
+            new Set<string>([
+              "commit",
+              "status",
+              "stats",
+              "stop",
+              "end",
+              "help",
+            ]);
+
+          if (
+            state.interactive &&
+            !interactiveSafe.has(command)
+          ) {
+            ctx.ui.notify(
+              "Interactive mode is active. Use /loop commit or /loop stop first.",
+              "error",
+            );
+
+            return;
+          }
+
+          if (
+            command ===
+            "interactive"
+          ) {
+            if (!remainder) {
+              ctx.ui.notify(
+                "Usage: /loop interactive <goal> [--check CMD] [--model M] ...",
+                "error",
+              );
+
+              return;
+            }
+
+            const parsed =
+              parseStartArgs(
+                remainder,
+              );
+
+            applyGoalConfig(
+              parsed,
+            );
+
+            await startInteractive(
+              pi,
+              ctx,
+              parsed,
+            );
+
+            return;
+          }
+
           if (
             command ===
             "start"
@@ -2520,6 +2708,16 @@ function goalSummaryText(): string {
             applyGoalConfig(
               parsed,
             );
+
+            if (parsed.interactive) {
+              await startInteractive(
+                pi,
+                ctx,
+                parsed,
+              );
+
+              return;
+            }
 
             const gitReady =
               await ensureGitRepository(
@@ -2589,6 +2787,16 @@ function goalSummaryText(): string {
             applyGoalConfig(
               parsed,
             );
+
+            if (parsed.interactive) {
+              await startInteractive(
+                pi,
+                ctx,
+                parsed,
+              );
+
+              return;
+            }
 
             persistState(
               pi,
@@ -2875,6 +3083,27 @@ function goalSummaryText(): string {
             command ===
             "stop"
           ) {
+            if (state.interactive) {
+              stopInteractive(state);
+              persistState(pi);
+
+              if (!ctx.isIdle()) {
+                ctx.abort();
+              }
+
+              ctx.ui.setStatus(
+                "loop",
+                undefined,
+              );
+
+              ctx.ui.notify(
+                "Interactive mode stopped; changes were left uncommitted.",
+                "info",
+              );
+
+              return;
+            }
+
             runToken++;
 
             clearPendingTimer();
@@ -2948,10 +3177,43 @@ function goalSummaryText(): string {
             command ===
             "status"
           ) {
+            let text = statusText(ctx);
+
+            if (state.interactive) {
+              const run = gitRunner(ctx);
+
+              const drift = await countDrift(
+                run,
+                state.interactiveBaselineSha,
+              );
+
+              const facts = await collectBatchFacts(
+                run,
+                state.interactiveBaselineSha,
+              );
+
+              const stale =
+                Boolean(state.interactivePlanHash) &&
+                facts.ok &&
+                state.interactivePlanHash !==
+                  planHash(
+                    facts.diff,
+                    facts.statusText,
+                  );
+
+              text +=
+                "\n" +
+                interactiveStatusLines({
+                  baselineSha:
+                    state.interactiveBaselineSha,
+                  driftCount: drift,
+                  planAt: state.interactivePlanAt,
+                  planHashStale: stale,
+                }).join("\n");
+            }
+
             ctx.ui.notify(
-              `Loop state:\n${statusText(
-                ctx,
-              )}`,
+              `Loop state:\n${text}`,
               "info",
             );
 
@@ -2987,6 +3249,10 @@ function goalSummaryText(): string {
                 "/loop run [--model M] — one atom in a fresh Pi session (clean context)\n" +
                 "/loop run --until-done [--model M] [--max N] — autonomous atoms, fresh Pi session per atom\n" +
                 "/loop resume — next atom in a fresh Pi session (clean context)\n" +
+                "/loop interactive <goal> — interactive mode: user-driven, no commits until /loop commit\n" +
+                "/loop <goal> --interactive — same as /loop interactive <goal>\n" +
+                "/loop commit — propose retroactive atoms/tests, do not change project files\n" +
+                "/loop commit --apply — generate the plan if needed, apply it, and commit one batch checkpoint\n" +
                 "/loop status | /loop stats | /loop finish | /loop stop | /loop end\n\n" +
                 "Every implementation atom requires focused tests.\n" +
                 "Prefer 2–3 distinct positive and 2–3 distinct negative/error scenarios when meaningful.\n" +
@@ -3034,6 +3300,16 @@ function goalSummaryText(): string {
           applyGoalConfig(
             parsed,
           );
+
+          if (parsed.interactive) {
+            await startInteractive(
+              pi,
+              ctx,
+              parsed,
+            );
+
+            return;
+          }
 
           persistState(
             pi,
@@ -3084,6 +3360,24 @@ function goalSummaryText(): string {
           "loop",
           statusBarText(),
         );
+        return;
+      }
+
+      /**
+       * Interactive mode never acts on its own: keep it across a restart
+       * so the baseline and the stored plan survive.
+       */
+      if (state.interactive) {
+        ctx.ui.setStatus(
+          "loop",
+          statusBarText(),
+        );
+
+        ctx.ui.notify(
+          "Interactive loop resumed; run /loop commit when the batch is ready.",
+          "info",
+        );
+
         return;
       }
 
@@ -3179,6 +3473,17 @@ function goalSummaryText(): string {
           systemPrompt:
             `${event.systemPrompt}\n\n` +
             "This atomic session is already closed. Do not perform any more work. The controller will create the next session if autonomous mode is active.",
+        };
+      }
+
+      if (state.interactive) {
+        return {
+          systemPrompt:
+            `${event.systemPrompt}\n\n` +
+            interactiveSystemNote(
+              state.description,
+              INTERACTIVE_JOURNAL_FILE,
+            ),
         };
       }
 
@@ -3278,7 +3583,8 @@ function goalSummaryText(): string {
       event,
     ) => {
       if (
-        !state.active
+        !state.active &&
+        !state.interactive
       ) {
         return;
       }
@@ -3354,7 +3660,7 @@ function goalSummaryText(): string {
       ctx,
     ) => {
       if (
-        !state.active ||
+        (!state.active && !state.interactive) ||
         degenerateAbortPending
       ) {
         return;
@@ -3453,7 +3759,7 @@ function goalSummaryText(): string {
       event,
     ) => {
       if (
-        !state.active ||
+        (!state.active && !state.interactive) ||
         event.message.role !==
           "assistant"
       ) {
