@@ -6,11 +6,12 @@ set -euo pipefail
 #   - the install ref in README.md, DOCUMENTATION.md, DOCUMENTATION_ru.md
 #     (pi install git:github.com/fbezruchko/pi-atomic-loop@vX.Y.Z)
 #
-# Then commits the touched files and tags vX.Y.Z. With --push it also
-# pushes main + tag to origin.
+# Then commits the touched files and creates an ANNOTATED tag vX.Y.Z with a
+# one-line message describing the release. With --push it also pushes main +
+# tag to origin.
 #
-# Usage: scripts/bump-version.sh <version> [--push]
-#   e.g. scripts/bump-version.sh 1.0.8 --push
+# Usage: scripts/bump-version.sh <version> [--push] [tag message]
+#   e.g. scripts/bump-version.sh 1.2.0 --push "v1.2.0 — interactive mode"
 
 VER="${1:-}"
 case "$VER" in
@@ -21,7 +22,15 @@ case "$VER" in
 esac
 
 PUSH=0
-[ "${2:-}" = "--push" ] && PUSH=1
+TAGMSG=""
+for arg in "${@:2}"; do
+  if [ "$arg" = "--push" ]; then
+    PUSH=1
+  elif [ -n "$arg" ]; then
+    TAGMSG="$arg"
+  fi
+done
+TAGMSG="${TAGMSG:-Release v$VER}"
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -48,7 +57,7 @@ if git rev-parse -q --verify "refs/tags/v$VER" >/dev/null; then
   echo "tag v$VER already exists — refusing to overwrite." >&2
   exit 1
 fi
-git tag "v$VER"
+git tag -a -m "$TAGMSG" "v$VER"
 echo "Committed and tagged v$VER."
 
 if [ "$PUSH" = 1 ]; then
