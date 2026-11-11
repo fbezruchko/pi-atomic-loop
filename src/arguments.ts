@@ -17,6 +17,9 @@ export interface StartArgs {
 
   /** prepare: skip the plan dialogue and use defaults (mvp + weak). */
   quick: boolean;
+
+  /** start interactive mode: no commits until /loop commit. */
+  interactive: boolean;
 }
 
 function extractCheckCommand(text: string): {
@@ -101,6 +104,7 @@ export function parseStartArgs(
   let rescueModel = "";
   let goalFile = "";
   let quick = false;
+  let interactive = false;
 
   const kept: string[] = [];
 
@@ -296,6 +300,13 @@ export function parseStartArgs(
     }
 
     if (
+      token === "--interactive"
+    ) {
+      interactive = true;
+      continue;
+    }
+
+    if (
       token === "--mode" &&
       tokens[i + 1]
     ) {
@@ -380,5 +391,26 @@ export function parseStartArgs(
     rescueModel,
     goalFile,
     quick,
+    interactive,
+  };
+}
+
+export function parseCommitArgs(
+  args: string,
+): {
+  apply: boolean;
+  unknown: string[];
+} {
+  const tokens = args
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return {
+    apply: tokens.includes("--apply"),
+
+    unknown: tokens.filter(
+      (token) => token !== "--apply",
+    ),
   };
 }

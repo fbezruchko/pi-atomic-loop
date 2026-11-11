@@ -17,7 +17,7 @@
   "type": "module",
   "scripts": {
     "lint": "for file in extensions/index.ts src/*.ts; do node --check \"$file\"; done",
-    "test": "node --test tests/run-overrides.test.ts"
+    "test": "node --test tests/*.test.ts"
   },
   "files": [
     "extensions",
