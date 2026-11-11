@@ -122,3 +122,55 @@ test("countDrift counts intermediate commits", async () => {
 
   assert.equal(await countDrift(run, "base"), 2);
 });
+
+test("interactive baseline never swallows uncommitted work", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pi-loop-baseline-"));
+  const git = (args: string[]) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+
+  git(["init", "-q"]);
+  git(["config", "user.name", "Test"]);
+  git(["config", "user.email", "test@example.com"]);
+  writeFileSync(join(dir, "dirty.txt"), "work in progress\n");
+
+  const run: GitRunner = async (args) => {
+    try {
+      return {
+        code: 0,
+        stdout: execFileSync("git", args, {
+          cwd: dir,
+          encoding: "utf8",
+        }),
+        stderr: "",
+      };
+    } catch (error) {
+      const e = error as {
+        status?: number;
+        stdout?: string;
+        stderr?: string;
+      };
+
+      return {
+        code: e.status ?? 1,
+        stdout: e.stdout ?? "",
+        stderr: e.stderr ?? "",
+      };
+    }
+  };
+
+  const baseline = await ensureInteractiveBaseline(run);
+  assert.equal(baseline.ok, true);
+
+  const committed = git([
+    "show",
+    "--name-only",
+    "--pretty=format:",
+    baseline.sha,
+  ]).trim();
+
+  assert.equal(committed, "");
+
+  const facts = await collectBatchFacts(run, baseline.sha);
+  assert.equal(facts.ok, true);
+  assert.match(facts.diff, /dirty\.txt/);
+});

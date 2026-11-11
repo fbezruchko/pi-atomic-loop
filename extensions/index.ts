@@ -1115,7 +1115,9 @@ async function startInteractive(
   parsed: StartArgs,
 ): Promise<void> {
   const gitReady =
-    await ensureGitRepository(ctx);
+    await ensureInteractiveRepository(
+      ctx,
+    );
 
   if (!gitReady.ok) {
     state.active = false;
@@ -2499,6 +2501,46 @@ async function ensureGitRepository(
   return checkpointBeforeAtom(
     ctx,
   );
+}
+
+/**
+ * Interactive-mode repository setup: init, identity and excludes only.
+ * Unlike ensureGitRepository(), it never commits the current worktree:
+ * pre-existing uncommitted changes belong to the batch and must stay visible
+ * in `git diff <baseline>`.
+ */
+async function ensureInteractiveRepository(
+  ctx: ExtensionContext,
+): Promise<{
+  ok: boolean;
+  reason: string;
+}> {
+  if (!(await gitIsRepository(ctx))) {
+    const init = await gitExec(
+      ctx,
+      ["init"],
+    );
+
+    if (init.code !== 0) {
+      return {
+        ok: false,
+        reason: `git init failed: ${snippet(
+          init.stderr,
+          240,
+        )}`,
+      };
+    }
+
+    logIteration("git_init");
+  }
+
+  await ensureGitIdentity(ctx);
+  await ignoreLoopLog(ctx);
+
+  return {
+    ok: true,
+    reason: "interactive repository ready",
+  };
 }
 
 async function commitAtomicChanges(
