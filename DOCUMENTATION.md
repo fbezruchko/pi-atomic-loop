@@ -29,7 +29,7 @@ Unattended loop mode for [pi](https://github.com/earendil-works/pi): you give th
 From git (recommended for now):
 
 ```bash
-pi install git:github.com/fbezruchko/pi-atomic-loop@v1.0.9
+pi install git:github.com/fbezruchko/pi-atomic-loop@v1.2.0
 ```
 
 Or from a local checkout:
