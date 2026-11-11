@@ -42,9 +42,11 @@ import {
 import {
   buildApplyPrompt,
   buildPlanPrompt,
+  formatCommitMessage,
   interactiveCommitGuard,
   interactiveStatusLines,
   interactiveSystemNote,
+  parseCommitBlocked,
   parseMarkerIds,
   planHash,
   resolveCommitMode,
@@ -55,6 +57,7 @@ import {
   collectBatchFacts,
   countDrift,
   ensureInteractiveBaseline,
+  getHeadSha,
   type GitRunner,
 } from "../src/interactive-git.ts";
 
@@ -1377,6 +1380,149 @@ async function handleInteractiveAgentEnd(
 
     return;
   }
+
+  const blocked = parseCommitBlocked(text);
+
+  if (blocked) {
+    state.interactiveCommitPending = "";
+    state.lastNotice = `Interactive batch blocked: ${blocked}`;
+    persistState(pi);
+    logIteration(
+      "interactive_blocked",
+      { reason: blocked },
+    );
+    ctx.ui.notify(
+      `Interactive batch blocked: ${blocked}\nNo commit was created.`,
+      "warning",
+    );
+    return;
+  }
+
+  const ids = parseMarkerIds(
+    text,
+    "COMMIT_APPLIED",
+  );
+
+  if (!ids) {
+    state.interactiveCommitPending = "";
+    persistState(pi);
+    ctx.ui.notify(
+      "Loop: no COMMIT_APPLIED or COMMIT_BLOCKED from the agent; nothing committed.",
+      "error",
+    );
+    return;
+  }
+
+  await finalizeInteractiveBatch(
+    pi,
+    ctx,
+    ids,
+  );
+}
+
+async function finalizeInteractiveBatch(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  ids: string[],
+): Promise<void> {
+  const facts = await collectBatchFacts(
+    gitRunner(ctx),
+    state.interactiveBaselineSha,
+  );
+
+  if (!facts.ok) {
+    state.interactiveCommitPending = "";
+    persistState(pi);
+    ctx.ui.notify(
+      `Loop: ${facts.reason}`,
+      "error",
+    );
+    return;
+  }
+
+  const previousBaseline =
+    state.interactiveBaselineSha;
+
+  const commit =
+    await commitAllCurrentChanges(
+      ctx,
+      formatCommitMessage(ids),
+    );
+
+  if (!commit.ok) {
+    state.interactiveCommitPending = "";
+    persistState(pi);
+    ctx.ui.notify(
+      `Loop: ${commit.reason}`,
+      "error",
+    );
+    return;
+  }
+
+  if (!commit.committed) {
+    const clean = await gitExec(
+      ctx,
+      [
+        "diff",
+        "--quiet",
+        previousBaseline,
+      ],
+    );
+
+    if (clean.code !== 0) {
+      state.interactiveCommitPending = "";
+      persistState(pi);
+      ctx.ui.notify(
+        "Loop: nothing staged; the batch may be inconsistent.",
+        "error",
+      );
+      return;
+    }
+  }
+
+  const newSha =
+    (await getHeadSha(gitRunner(ctx))) ??
+    previousBaseline;
+
+  state.interactiveBaselineSha = newSha;
+  resetInteractiveBatch(state);
+  state.status = "stopped";
+  state.lastNotice =
+    "Interactive batch committed.";
+
+  persistState(pi);
+
+  await piGlobal!.exec(
+    "bash",
+    [
+      "-lc",
+      `rm -f ${INTERACTIVE_PLAN_FILE}`,
+    ],
+    { timeout: 10_000 },
+  );
+
+  await ensureInteractiveJournal(ctx);
+
+  logIteration(
+    "interactive_batch_committed",
+    {
+      atoms: ids,
+      sha: newSha,
+      alreadyCommitted: !commit.committed,
+    },
+  );
+
+  ctx.ui.setStatus(
+    "loop",
+    statusBarText(),
+  );
+
+  ctx.ui.notify(
+    `Batch committed as ${shortSha(
+      newSha,
+    )} (atoms ${ids.join(", ")}); interactive mode continues.`,
+    "info",
+  );
 }
 
 function statusText(
