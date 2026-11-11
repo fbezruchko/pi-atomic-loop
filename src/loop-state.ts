@@ -96,6 +96,15 @@ export interface LoopState {
   atomsCompletedThisRun: number;
   autonomousRunStartedAt: number;
 
+  /** Interactive mode (user-driven, uncommitted batch). */
+  interactive: boolean;
+  interactiveBaselineSha: string;
+  interactiveStartedAt: number;
+  interactivePlan: string;
+  interactivePlanHash: string;
+  interactivePlanAt: number;
+  interactiveCommitPending: "" | "plan" | "apply";
+
   /**
    * Durable handoff marker written into the replacement session.
    * Unlike a module-level variable, this survives Pi's extension runtime
@@ -246,6 +255,14 @@ export function defaultState(): LoopState {
     autonomousRunStartedAt: 0,
     autonomousHandoffPending: false,
 
+    interactive: false,
+    interactiveBaselineSha: "",
+    interactiveStartedAt: 0,
+    interactivePlan: "",
+    interactivePlanHash: "",
+    interactivePlanAt: 0,
+    interactiveCommitPending: "",
+
     status: "stopped",
     lastNotice: "",
   };
@@ -318,6 +335,38 @@ export function restoreLoopState(
     result.autonomousRunStartedAt = 0;
   }
 
+  if (typeof result.interactive !== "boolean") {
+    result.interactive = false;
+  }
+
+  if (typeof result.interactiveBaselineSha !== "string") {
+    result.interactiveBaselineSha = "";
+  }
+
+  if (typeof result.interactiveStartedAt !== "number") {
+    result.interactiveStartedAt = 0;
+  }
+
+  if (typeof result.interactivePlan !== "string") {
+    result.interactivePlan = "";
+  }
+
+  if (typeof result.interactivePlanHash !== "string") {
+    result.interactivePlanHash = "";
+  }
+
+  if (typeof result.interactivePlanAt !== "number") {
+    result.interactivePlanAt = 0;
+  }
+
+  if (
+    !["", "plan", "apply"].includes(
+      result.interactiveCommitPending,
+    )
+  ) {
+    result.interactiveCommitPending = "";
+  }
+
   return result;
 }
 
@@ -336,5 +385,27 @@ export function persistedLoopState(
       state.recentToolResults.slice(-10),
     regressionAffectedAtomIds:
       state.regressionAffectedAtomIds.slice(-50),
+    interactivePlan:
+      state.interactivePlan.slice(0, 20_000),
   };
+}
+
+/** Clears the current plan/hash but keeps interactive mode and its baseline. */
+export function resetInteractiveBatch(
+  state: LoopState,
+): void {
+  state.interactivePlan = "";
+  state.interactivePlanHash = "";
+  state.interactivePlanAt = 0;
+  state.interactiveCommitPending = "";
+}
+
+/** Leaves interactive mode entirely; uncommitted changes stay in the worktree. */
+export function stopInteractive(
+  state: LoopState,
+): void {
+  state.interactive = false;
+  state.interactiveBaselineSha = "";
+  state.interactiveStartedAt = 0;
+  resetInteractiveBatch(state);
 }
