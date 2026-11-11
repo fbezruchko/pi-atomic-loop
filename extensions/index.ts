@@ -6,6 +6,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import {
+  parseCommitArgs,
   parseStartArgs,
   type StartArgs,
 } from "../src/arguments.ts";
@@ -39,9 +40,14 @@ import {
 } from "../src/loop-state.ts";
 
 import {
+  buildApplyPrompt,
+  buildPlanPrompt,
+  interactiveCommitGuard,
   interactiveStatusLines,
   interactiveSystemNote,
+  parseMarkerIds,
   planHash,
+  resolveCommitMode,
   shortSha,
 } from "../src/interactive.ts";
 
@@ -1177,6 +1183,200 @@ async function startInteractive(
     )}. Work normally; run /loop commit when the batch is ready.`,
     "info",
   );
+}
+
+async function sendInteractiveCommit(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  apply: boolean,
+): Promise<void> {
+  const guard =
+    interactiveCommitGuard(
+      state.interactive,
+      ctx.isIdle(),
+    );
+
+  if (guard) {
+    ctx.ui.notify(guard, "error");
+    return;
+  }
+
+  const facts =
+    await collectBatchFacts(
+      gitRunner(ctx),
+      state.interactiveBaselineSha,
+    );
+
+  if (!facts.ok) {
+    ctx.ui.notify(
+      `Loop: ${facts.reason}`,
+      "error",
+    );
+    return;
+  }
+
+  const hash = planHash(
+    facts.diff,
+    facts.statusText,
+  );
+
+  const mode = resolveCommitMode({
+    apply,
+    hasPlan: Boolean(state.interactivePlan),
+    planMatches:
+      state.interactivePlanHash === hash,
+  });
+
+  state.interactiveCommitPending =
+    mode === "plan" ? "plan" : "apply";
+
+  persistState(pi);
+
+  logIteration(
+    "interactive_commit_request",
+    { mode },
+  );
+
+  const input = {
+    goal: state.description,
+    criteria: state.completionCriteria,
+    goalFile: state.goalFile,
+    baselineSha: state.interactiveBaselineSha,
+    journalFile: INTERACTIVE_JOURNAL_FILE,
+    planFile: INTERACTIVE_PLAN_FILE,
+    diffStat: facts.stat,
+    changedPaths:
+      facts.paths.join("\n") || "(none)",
+    checkCommand: state.checkCommand,
+  };
+
+  const content =
+    mode === "plan"
+      ? buildPlanPrompt(input)
+      : buildApplyPrompt({
+          ...input,
+          planText:
+            mode === "apply"
+              ? state.interactivePlan
+              : "",
+        });
+
+  if (mode === "apply-replan") {
+    ctx.ui.notify(
+      "Loop: batch changed since the plan; regenerating it and applying in this turn.",
+      "info",
+    );
+  }
+
+  pi.sendMessage(
+    {
+      customType: MESSAGE_TYPE,
+      content,
+      display: true,
+      details: {
+        kind: "interactive-commit",
+        mode,
+      },
+    },
+    { triggerTurn: true },
+  );
+}
+
+async function handleInteractiveAgentEnd(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  text: string,
+): Promise<void> {
+  const pending =
+    state.interactiveCommitPending;
+
+  if (!pending) {
+    return;
+  }
+
+  if (pending === "plan") {
+    const ids = parseMarkerIds(
+      text,
+      "COMMIT_PLAN_READY",
+    );
+
+    if (!ids) {
+      state.interactiveCommitPending = "";
+      persistState(pi);
+      ctx.ui.notify(
+        "Loop: no COMMIT_PLAN_READY from the agent; no plan stored.",
+        "error",
+      );
+      return;
+    }
+
+    const plan = await piGlobal!.exec(
+      "bash",
+      [
+        "-lc",
+        `cat ${INTERACTIVE_PLAN_FILE}`,
+      ],
+      { timeout: 10_000 },
+    );
+
+    const planText = (
+      plan.code === 0
+        ? plan.stdout ?? ""
+        : ""
+    ).trim();
+
+    if (!planText) {
+      state.interactiveCommitPending = "";
+      persistState(pi);
+      ctx.ui.notify(
+        `Loop: ${INTERACTIVE_PLAN_FILE} is missing or empty.`,
+        "error",
+      );
+      return;
+    }
+
+    const facts =
+      await collectBatchFacts(
+        gitRunner(ctx),
+        state.interactiveBaselineSha,
+      );
+
+    if (!facts.ok) {
+      state.interactiveCommitPending = "";
+      persistState(pi);
+      ctx.ui.notify(
+        `Loop: ${facts.reason}`,
+        "error",
+      );
+      return;
+    }
+
+    state.interactivePlan =
+      planText.slice(0, 20_000);
+    state.interactivePlanHash = planHash(
+      facts.diff,
+      facts.statusText,
+    );
+    state.interactivePlanAt = Date.now();
+    state.interactiveCommitPending = "";
+    state.status = "stopped";
+    state.lastNotice =
+      `Interactive plan ready: ${ids.join(", ")}`;
+
+    persistState(pi);
+
+    logIteration(
+      "interactive_plan_ready",
+      { atoms: ids },
+    );
+
+    ctx.ui.notify(
+      `Interactive plan ready for ${ids.join(", ")}.\nFile: ${INTERACTIVE_PLAN_FILE}\nReview it, then run /loop commit --apply.`,
+      "info",
+    );
+
+    return;
+  }
 }
 
 function statusText(
@@ -2687,6 +2887,35 @@ function goalSummaryText(): string {
 
           if (
             command ===
+            "commit"
+          ) {
+            const parsedCommit =
+              parseCommitArgs(remainder);
+
+            if (
+              parsedCommit.unknown.length > 0
+            ) {
+              ctx.ui.notify(
+                `Unknown /loop commit options: ${parsedCommit.unknown.join(
+                  ", ",
+                )}`,
+                "error",
+              );
+
+              return;
+            }
+
+            await sendInteractiveCommit(
+              pi,
+              ctx,
+              parsedCommit.apply,
+            );
+
+            return;
+          }
+
+          if (
+            command ===
             "start"
           ) {
             if (
@@ -3900,6 +4129,27 @@ function goalSummaryText(): string {
               "info",
             );
           }
+        }
+
+        if (state.interactive) {
+          const lastAssistant =
+            [
+              ...event.messages,
+            ]
+              .reverse()
+              .find(
+                (message) =>
+                  message.role ===
+                  "assistant",
+              );
+
+          await handleInteractiveAgentEnd(
+            pi,
+            ctx,
+            messageToText(lastAssistant),
+          );
+
+          return;
         }
 
         return;
