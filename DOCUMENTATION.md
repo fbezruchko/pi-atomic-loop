@@ -11,6 +11,7 @@ Unattended loop mode for [pi](https://github.com/earendil-works/pi): you give th
 1. [Installation](#1-installation)
 2. [Quick start](#2-quick-start)
 3. [Core concept](#3-core-concept)
+   - [Interactive mode](#interactive-mode)
 4. [Command reference](#4-command-reference)
 5. [Options in detail](#5-options-in-detail)
 6. [The goal function (`--check`)](#6-the-goal-function---check)
@@ -147,6 +148,31 @@ The loop works like this (atomic coding cycles):
 - **Objective truth**: with `--check`, a shell command decides progress and completion — not the model's self-assessment.
 - **Persistence**: loop state lives in session entries; the fresh-session handoff marker lets the controller recognize its own replacement sessions.
 
+### Interactive mode
+
+Interactive mode is the third mode, for work that is easier to drive by hand than to pre-plan as atoms.
+
+```text
+/loop interactive <goal> [--check "npm test"]
+# or: /loop <goal> --interactive
+
+# ... the operator asks, the agent implements in the same session ...
+
+/loop commit          # propose retroactive atoms + tests; changes nothing
+/loop commit --apply  # generate the plan if needed, apply it, commit one checkpoint
+```
+
+How it behaves:
+
+- **No commits during the session.** The controller records `interactiveBaselineSha` when the mode starts and never commits until `/loop commit --apply`. It compares against this stored SHA, not `HEAD`, so an accidental intermediate commit cannot hide changes from `git diff <baseline>`.
+- **Change facts.** At commit time the batch is `git diff <baseline>` plus untracked files (marked with `git add -N .`) and the intent journal `INTERACTIVE-JOURNAL.md`. The agent appends one short entry per substantive request (`## <timestamp> — <request>`, `Changed:`, `Tests:`). The journal is committed with the batch.
+- **Plan phase.** `/loop commit` only produces `.pi-loop/interactive-commit-plan.md`: proposed atoms in the GOAL.md template (goal, files, 2–3 positive and 2–3 negative/error scenarios where meaningful, test, verify, acceptance), tests to add or repair, regression candidates, checks, and the commit message. It ends with `COMMIT_PLAN_READY: <ids>`. The plan and a hash of the batch are stored in loop state. Project files are not modified.
+- **Apply phase.** `/loop commit --apply` uses the stored plan only when its hash still matches. Otherwise it regenerates the plan and executes it in the same turn. The agent retroactively appends atoms as `Status: COMPLETED` with `Retrospective: interactive batch <sha>`, updates `PROGRESS.md` and `TESTMANUAL.md`, writes missing focused tests, runs them and the configured check, applies the regression protocol when an older atom is affected, and performs release semantics (version bump, CHANGELOG) itself. It ends with `COMMIT_APPLIED: <ids>` only when green, otherwise `COMMIT_BLOCKED: <reason>`.
+- **One checkpoint.** On `COMMIT_APPLIED` the extension runs `git add -A` and one commit: `loop: interactive batch (<first>-<last>)`. The new HEAD becomes the next baseline; interactive mode stays on, so batches can be committed repeatedly. The plan file is removed and the journal gets a new `## Batch` header.
+- **No planning gate.** GOAL.md is not required when the mode starts; `/loop commit` creates or extends it retroactively. Atom IDs follow the file's existing conventions and are chosen by the agent, exactly as in the other modes.
+- **No autonomous machinery.** `state.active` stays false: no atom selection, no `CYCLE_DONE` handling, no stuck escalation, no per-turn check. Degenerate-repetition protection still runs, and a session restart keeps interactive mode, its baseline and its plan.
+- **Blocked commands.** While interactive mode is on only `/loop commit`, `/loop status`, `/loop stats`, `/loop stop`, `/loop end`, and `/loop help` are accepted. `/loop stop` leaves changes uncommitted and clears the interactive state.
+
 ---
 
 ## 4. Command reference
@@ -160,6 +186,10 @@ The loop works like this (atomic coding cycles):
 | `/loop start <goal> [flags]` | Shortcut: set goal + start immediately (one step, fresh Pi session). |
 | `/loop <goal>` | Short form of `/loop goal <goal>` — sets the goal and configuration, **starts nothing**. |
 | `/loop resume [--max N] [--check "CMD"] [--model M] [--rescue-model M]` | Continue a stopped/paused loop in a **fresh Pi session** (clean context), optionally with a new cap/check/model. |
+| `/loop interactive <goal> [flags]` | Start interactive mode: the operator drives, nothing is committed until `/loop commit`. |
+| `/loop <goal> --interactive` | Same as `/loop interactive <goal>`. |
+| `/loop commit` | Propose retroactive atoms and tests for the interactive batch; does not modify project files. |
+| `/loop commit --apply` | Generate the plan if needed, apply it (docs, tests, regression, check), then commit one batch checkpoint. |
 | `/loop status` | Show the full state. |
 | `/loop stats` | Statistics from the iteration log (`.pi-loop-log.jsonl`): events, interventions, productive iterations/h, score trend. |
 | `/loop finish` | Soft stop: the current iteration completes, then no new turn (state preserved for `/loop resume`). Alias: `/loop soft-stop`. |
@@ -180,6 +210,7 @@ The loop works like this (atomic coding cycles):
 | `--rescue-model M` | Stronger model that takes over for **one** cleanup turn after 3 consecutive stuck interventions (see [section 7](#7-error-and-failure-handling)). |
 | `--until-done` | Loop stops on verified completion. |
 | `--quick` | `prepare` only: skip the plan dialogue; use defaults (`Complexity: mvp`, `Model tier: weak`). |
+| `--interactive` | Start interactive mode (same as `/loop interactive <goal>`). |
 
 **Goal syntax:** everything before `Done when:` is the goal, everything after are the criteria:
 

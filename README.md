@@ -22,6 +22,7 @@ This fork changes the core behavior to **atomic coding cycles**: the work is dec
 - **Atomic coding cycles, one atom per session**: supervised or autonomous. Each atom is one small observable behavior with a focused test. One Pi session works on exactly one atom, then stops; the next atom gets a *genuinely fresh* Pi session — conversation history is deliberately not durable state.
 - **Supervised mode (default)**: one operator-driven cycle does one atom (minimal change → smoke check → focused tests → docs → `CYCLE_DONE:`), then stops automatically. The operator tests the result and starts the next cycle or gives feedback.
 - **Autonomous mode (`--until-done`)**: the controller persists durable state, creates a Git checkpoint, replaces the Pi session, restores state in the new session, and continues until the check passes or MVP is reached — without implementing two atoms in one session.
+- **Interactive mode (`--interactive`)**: you drive the session conversationally and the agent edits the project for real, but nothing is committed. The controller remembers the batch baseline commit (not current `HEAD`, so accidental commits do not lose changes) and keeps an `INTERACTIVE-JOURNAL.md`. `/loop commit` proposes retroactive atoms, tests and regression retests; `/loop commit --apply` executes the plan and creates exactly one Git checkpoint for the batch. Interactive mode then continues with a new baseline.
 - **Objective goal function** (`--check "CMD"`): a shell command run after every iteration. Exit code 0 = criteria met (verified completion in `--until-done` mode — the check decides, not the model's claim). Optional `SCORE: <n>` output enables progress tracking: score improvements count as real progress, score regressions trigger an immediate "find and fix the regression" prompt. Essential against models that claim success without delivering.
 - **Error resilience**: transient model/provider errors retry with exponential backoff (5s → 5min). Context-pressure failures take a safer path: emergency compaction without another model call, followed by a two-attempt circuit breaker instead of an endless `400` retry loop.
 - **Garbage/repetition detection**: repeated assistant answers (exact fingerprints *and* near-duplicates via trigram similarity with numbers masked, alternating A-B-A-B patterns), repeated tool results/errors, repeated questions, and narration-only turns (3 turns without a single tool call) are all detected. Instead of pausing, the loop injects rotating recovery strategies (switch subtask, write PROGRESS.md, run tests and fix one failure, review diffs, list alternative approaches) with escalating delays — important for weaker open-source models that loop on the same output.
@@ -51,6 +52,19 @@ This fork changes the core behavior to **atomic coding cycles**: the work is dec
 
 Planning and execution are decoupled: an expensive model writes a precise spec once (`GOAL.md`, reviewable/editable before the run), a cheap or local model executes it for days. The run model is persisted and restored on auto-resume. Switch models mid-run with `/loop stop` + `/loop resume --model M`.
 
+## Interactive mode
+
+When the work is easier to drive by hand than to pre-plan as atoms, use interactive mode:
+
+```text
+/loop interactive <goal> [--check "npm test"]   # or: /loop <goal> --interactive
+# ... you ask, the agent implements, the journal records intent ...
+/loop commit          # propose retroactive atoms + test plan, change nothing
+/loop commit --apply  # build the plan if needed, apply it, commit one batch checkpoint
+```
+
+Changes stay uncommitted until `/loop commit --apply`. The batch baseline is a stored SHA, so even an accidental `git commit` during the session does not hide changes from `git diff <baseline>`. GOAL.md/PROGRESS.md/TESTMANUAL.md are updated retroactively, missing focused tests are added, the configured check and the regression protocol run, and the extension creates a single commit: `loop: interactive batch (A001-A003)`. The mode then stays on with the new commit as the next baseline. `/loop stop` leaves the changes uncommitted and leaves interactive mode.
+
 ## Commands
 
 Pi slash commands only match the first word, so this package registers a single `/loop` command with subcommands:
@@ -68,6 +82,10 @@ Pi slash commands only match the first word, so this package registers a single 
 | `/loop start <goal> --check "./check.sh" --check-timeout 300` | Check with custom timeout (default 120s). |
 | `/loop start <goal> --until-done` | Stop on verified completion (check passes; without check: `LOOP_DONE:`). |
 | `/loop start <goal> --rescue-model M` | Stronger model takes over for one cleanup turn after 3 consecutive stuck interventions. |
+| `/loop interactive <goal> [flags]` | Start interactive mode: you drive, nothing is committed until `/loop commit`. |
+| `/loop <goal> --interactive` | Same as `/loop interactive <goal>`. |
+| `/loop commit` | Propose retroactive atoms/tests for the batch; does not modify project files. |
+| `/loop commit --apply` | Generate the plan if needed, apply it (docs, tests, regression, check), then commit one batch checkpoint. |
 | `/loop resume [--max N] [--model M] [--rescue-model M]` | Continue a stopped/paused loop, optionally switching models. |
 | `/loop status` | Show loop state, errors, interventions, iterations. |
 | `/loop stats` | Summarize the per-iteration JSONL log: events, interventions, iterations/hour, score trend. |
@@ -163,7 +181,8 @@ pi-atomic-loop/
 ├── CHANGELOG.md
 ├── LICENSE                   # GNU AGPL v3.0 only
 ├── extensions/index.ts       # Pi command/event orchestration
-├── src/                       # Repetition, parsing, state, checks, and bounded logging
+├── src/                       # Parsing, state, checks, repetition, interactive mode helpers
+├── docs/superpowers/          # Design docs and implementation plans
 ├── skills/loop-skill/SKILL.md  # Behavior rules for the model in loop mode
 ├── prompts/loop-prompt.md    # Prompt template
 └── prompts/loop-examples.md  # /loop-examples — project-specific loop recipes (features, bugs, tests, …)

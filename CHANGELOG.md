@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Interactive mode (`--interactive` / `/loop interactive <goal>`).** The operator drives one session conversationally: the agent edits the project for real, but the controller creates no checkpoints, no fresh sessions and no atom markers. The batch baseline is a stored SHA (not `HEAD`), so an accidental intermediate commit cannot hide changes. The agent keeps `INTERACTIVE-JOURNAL.md` for intent, and `git diff <baseline>` plus untracked files (`git add -N .`) provide the change facts.
+- **`/loop commit` and `/loop commit --apply`.** The plan phase writes `.pi-loop/interactive-commit-plan.md` with retroactive atoms, missing tests, regression candidates and the check commands, and changes no project files. The apply phase executes a matching plan (or regenerates a stale one in the same turn), updates GOAL.md/PROGRESS.md/TESTMANUAL.md, adds and runs focused tests, runs the configured check, applies the regression protocol, performs release semantics, and then the extension creates exactly one `loop: interactive batch (...)` checkpoint. Interactive mode continues with the new baseline.
+- Interactive mode survives a session restart; `/loop stop` leaves changes uncommitted and leaves the mode. Unit tests cover argument parsing, markers, plan hashing, prompt guards, Git batch facts and state persistence.
+
 ## 1.0.8
 
 - **Fix: missing acceptance check for OPEN atoms.** Agents are now instructed to verify if an `OPEN` atom is already completed (e.g. via tests or checking files) before starting it. If completed, the atom is marked as `COMPLETED` in `PROGRESS.md` and the agent moves to the next task. This prevents redundant work and potential loops in clean sessions.
